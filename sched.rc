@@ -1,0 +1,14 @@
+# taskwarrior config file for tw-sched-sh
+
+report.sch-target.description=list of scheduline targets, soonest first
+report.sch-target.columns=id,scheduled,project,description.desc
+report.sch-target.labels=ID,Scheduled,Project,Description
+report.sch-target.filter=+PENDING scheduled.after:now
+report.sch-target.sort=scheduled+,project+,urgency-
+
+
+report.sch-cand.description=list of scheduline candidates, most urgent first
+report.sch-cand.columns=project,tags,description.count,urgency
+report.sch-cand.labels=Project,Tags,Description,Urgency
+report.sch-cand.filter=+PENDING +READY
+report.sch-cand.sort=urgency-,description+
