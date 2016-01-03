@@ -43,19 +43,19 @@ at the Schedule > prompt;
 
 ```
 ## Installing
-    Clone this github repo. To use ~/.task/scripts/, paste this;
-```
-git clone github.com/linuxcaffe/tw-sched-sh.git ~/.task/scripts/
-```
-    in a console, then put (or symlink) tsch.sh in your $PATH, like;
-```
-ln -s ~/.task/scripts/tw-sched-sh/tsch.sh ~/.task/scripts/tsch
-```
-    The sched.rc file must be included from .taskrc with an entry like
-```
-include ~/.task/scripts/sched.rc
-```
-    or tsch will exit with a message. Edit this file to set user configs.
+Clone this github repo. To use ~/.task/scripts/, paste this;
+
+    git clone github.com/linuxcaffe/tw-sched-sh.git ~/.task/scripts/
+
+in a console, then put (or symlink) tsch.sh in your $PATH, like;
+
+    ln -s ~/.task/scripts/tw-sched-sh/tsch.sh ~/.task/scripts/tsch
+
+The sched.rc file must be included from .taskrc with an entry like
+
+    include ~/.task/scripts/sched.rc
+
+or tsch will exit with a message. Edit this file to set user configs.
 
 ## Modes
     By default, tsch offers up the most urgent matching and ready tasks, one at
