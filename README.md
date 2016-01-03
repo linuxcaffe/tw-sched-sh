@@ -1,4 +1,7 @@
 # tw-sched-sh
+
+_STATUS: In development, coming along, still quite broken, BEWARE!_ 
+
 An urgency-driven, context-aware scheduling script for taskwarrior
 
 This script is designed to make the process of scheduling, re-scheduling and

@@ -6,7 +6,7 @@
 # An urgency-driven, context-aware scheduling script for taskwarrior
 
 ## Vars global
-TSCH_VERSION='0.5'
+TSCH_VERSION='0.7'
 RC_INCLUDED=`task _get rc.sched.rc.included`
 if [[ "$RC_INCLUDED" != yes ]]; then echo -e '
     it seems sched.rc is not found, or is somehow broken.
@@ -46,7 +46,7 @@ BATCH_LIMIT=`task _get rc.sched.cand.list.limit`
 CAND_LIST_LIMIT=`task _get rc.sched.cand.list.limit`
 TARGET_LIST_LIMIT=`task _get rc.sched.target.list.limit`
 DIVIDER='-------------------------------------'
-MODE='single' # batchsched, ask, resched, unsched, according to -i -r -u flags, the default is batch
+MODE='sched' # sched, resched, unsched
 
 
 ## Arguments
@@ -112,7 +112,7 @@ declare -A warning=([value]="[32;40m" [alt]="^[[38;5;242m" [end]="[0m")  # yel
 	    echo -e $DIVIDER
 	fi
 
-## No context or filter
+#### No context or filter
 	if [[ "$BATCH_MODE" == on ]] && [[ "$CONTEXT_CURRENT" == '' ]] && [[ "$FILTER" == '' ]]; then
 	    echo -e ' This command has no filter or context'
 	    echo ' and would apply to ALL tasks,'
@@ -157,14 +157,15 @@ fi
 if [[ "$prompt" == '' ]] && [[ "$TARGET_ID" == '' ]]; then
     echo ' No targets found, please enter a date'
     # TODO cycle prompt
-    elif [[ "$prompt" == '' ]] && [[ "$TARGET_ID" == [0-9] ]]; then
-    TASK_CMD='task '$CAND_ID' mod sched:'$CAND_ID'.scheduled'
+elif [[ "$prompt" == '' ]] && [[ "$TARGET_ID" = [0-9]+ ]]; then
+    TASK_CMD=`echo -e 'task '$CAND_ID' mod sched:'$CAND_ID'.scheduled'`
     echo $TASK_CMD
     read -ep ' (Y/n)' conf_prompt
 	if [[ "$conf_prompt" == [yY] ]] || [[ "$conf_prompt" == '' ]]; then
 	$TASK_CMD
-	else echo ' action cancelled, no changes made'; exit 0; fi
-    fi
+	else echo ' action cancelled, no changes made'; exit 0;
+	fi
+fi
     # elif prompt = [0-9]4'
     # else prompt = 
 
