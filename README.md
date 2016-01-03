@@ -4,14 +4,15 @@ _STATUS: In development, coming along, still quite broken, BEWARE!_
 
 An urgency-driven, context-aware scheduling script for taskwarrior
 
-This script is designed to make the process of scheduling, re-scheduling and
-un-scheduling even easier. Instead of a complex "algorithm", tw-sched-sh uses
-taskwarrior contexts and filters and "like-with-like" to match "candidates"
-with "targets". 
-* Candidates are matching, +READY (+PENDING and not blocked or scheduled.after:now)
-  and served up most-urgent-first. 
-* Targets are matching tasks with an upcoming sched:date, sorted soonest-first.
-The IDs are used as sched:ID.scheduled, the list length is configurable. 
+    This script is designed to make the process of scheduling, re-scheduling
+    and un-scheduling even easier. Instead of a complex "algorithm",
+    tw-sched-sh uses taskwarrior contexts and filters and "like-with-like" to
+    match "candidates" with "targets". 
+    * Candidates are matching, +READY (+PENDING and not blocked or
+      scheduled.after:now) and served up most-urgent-first. 
+    * Targets are matching tasks with an upcoming sched:date, sorted
+      soonest-first.  The IDs are used as sched:ID.scheduled, the list length
+      is configurable. 
 
 SCREENSHOT
 
@@ -41,19 +42,18 @@ at the Schedule > prompt;
     q[uit]		exit without changes
 
 ```
-
 ## Installing
     Clone this github repo. To use ~/.task/scripts/, paste this;
 ```
-    git clone github.com/linuxcaffe/tw-sched-sh.git ~/.task/scripts/
+git clone github.com/linuxcaffe/tw-sched-sh.git ~/.task/scripts/
 ```
     in a console, then put (or symlink) tsch.sh in your $PATH, like;
 ```
-    ln -s ~/.task/scripts/tw-sched-sh/tsch.sh ~/.task/scripts/tsch
+ln -s ~/.task/scripts/tw-sched-sh/tsch.sh ~/.task/scripts/tsch
 ```
     The sched.rc file must be included from .taskrc with an entry like
 ```
-    include ~/.task/scripts/sched.rc
+include ~/.task/scripts/sched.rc
 ```
     or tsch will exit with a message. Edit this file to set user configs.
 
