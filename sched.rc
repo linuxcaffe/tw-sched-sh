@@ -1,14 +1,31 @@
-# taskwarrior config file for tw-sched-sh
+### sched.rc config file, required by tw-sched-sh
+### by djp, Copyright 2016, licenced under MIT
 
-report.sch-target.description=list of scheduline targets, soonest first
-report.sch-target.columns=id,scheduled,project,description.desc
-report.sch-target.labels=ID,Scheduled,Project,Description
-report.sch-target.filter=+PENDING scheduled.after:now
-report.sch-target.sort=scheduled+,project+,urgency-
+## User configs;
+sched.tag=sch			# tag to mark tasks for (re)scheduling
+sched.batch.limit=10		# default max for batch-processing
+sched.cand.list.limit=5		# max candidates to list
+sched.target.list.limit=5	# max targets to list
+sched.datefmt=			# date format for target list
 
+## don't edit willy-nilly below this line, you might break something!
+##===================================================================
+sched.rc.included=yes 		# used to test that this file is included
 
-report.sch-cand.description=list of scheduline candidates, most urgent first
-report.sch-cand.columns=project,tags,description.count,urgency
-report.sch-cand.labels=Project,Tags,Description,Urgency
-report.sch-cand.filter=+PENDING +READY
-report.sch-cand.sort=urgency-,description+
+report.sch_target.description=list of scheduling targets, soonest first
+report.sch_target.columns=id,scheduled,project,tags,description.desc
+report.sch_target.labels=ID,Scheduled,Project,Tags,Description
+report.sch_target.filter=+PENDING scheduled.after:now
+report.sch_target.sort=scheduled+,project+,urgency-
+
+report.sch_cand.description=list of scheduline candidates, most urgent first
+report.sch_cand.columns=project,tags,description.count,urgency
+report.sch_cand.labels=Project,Tags,Description,Urgency
+report.sch_cand.filter=rc.verbose=label +PENDING +READY
+report.sch_cand.sort=urgency-,description+
+
+report.sch_cand_uuid.description=UUIDs of scheduline candidates, most urgent first
+report.sch_cand_uuid.columns=uuid
+report.sch_cand_uuid.labels=
+report.sch_cand_uuid.filter=+PENDING +READY
+report.sch_cand_uuid.sort=

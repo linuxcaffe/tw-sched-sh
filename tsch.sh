@@ -3,92 +3,176 @@
 # tsch.sh
 # Copyright (C) 2015 djp <djp@transit>
 # Distributed under terms of the MIT license.
-# a context-driven scheduling script for taskwarrior
-# LOOK OUT! crappy pseudo-code ahead!
+# An urgency-driven, context-aware scheduling script for taskwarrior
+
+## Vars global
 TSCH_VERSION='0.5'
+RC_INCLUDED=`task _get rc.sched.rc.included`
+if [[ "$RC_INCLUDED" != yes ]]; then echo -e '
+    it seems sched.rc is not found, or is somehow broken.
+
+    try adding
+    include ~/path/to/shed.rc
+    to your .taskrc file'
+    exit 1
+fi
+USAGE=`echo -e '	USAGE
+
+tsch.sh [--debug] [-b[n]] [-r] [-u] [@:[context]] [task filters]
+
+    -b[n]       batch-mode. Use "n" to override default limit.
+    -r          re-schedule-mode, acts on sched:stale and +sch tags
+    -u          un-schedule-mode, clear or reset currently scheduled tasks
+    @:[context] override current context, "@: " for none
+    filters     any trailing arguments are passed as task filters
+
+at the Schedule > prompt;
+    ID [+|- offset]     eg; 142, 217 + 15min, 67 - 2hr, 123 + 2dy, etc
+    date        	including forms like: mon, eow, 11th, Jul10, etc
+    h[elp]      	show this usage text
+    q[uit]      	exit without changes'`
 
 WIDTH=90
 DBG=''
-ARGS=$*
-if [[ "$1" == --debug ]]; then DBG='on'; shift; fi
-if [[ "$1" == -[rui+] ]]; then FLAGS=$1; shift; fi
-
-FILTER=$*
 TASK='task rc.verbose: rc.defaultwidth:'$WIDTH
 RPT_READY_UUID='rc.report.ready.columns=uuid rc.report.ready.labels= ready'
-LIST_DESC='rc.report.list.columns=description,scheduled rc.report.list.labels= list'
-DUEDATE=`$TASK _get rc.due`
-CONFIRM=`$TASK _get rc.confirmation`
+# LIST_DESC='rc.report.list.columns=description,scheduled rc.report.list.labels= list'
 SCHED_NONE_COUNT=`$TASK +PENDING $FILTER +READY scheduled.none: count`
 SCHED_OLD_COUNT=`$TASK +PENDING $FILTER +READY scheduled.before:today count`
 PENDING_COUNT=`$TASK rc.context: +PENDING count`
 READY_COUNT=`$TASK rc.context: +READY +PENDING count`
+BATCH_MODE=off
+BATCH_LIMIT=`task _get rc.sched.cand.list.limit`
+CAND_LIST_LIMIT=`task _get rc.sched.cand.list.limit`
+TARGET_LIST_LIMIT=`task _get rc.sched.target.list.limit`
 DIVIDER='-------------------------------------'
-MODE='batch' # sched, ask, resched, unsched, according to -i -r -u flags, the default is batch
+MODE='single' # batchsched, ask, resched, unsched, according to -i -r -u flags, the default is batch
 
 
-# function: get_contexts
+## Arguments
+# TODO function: parse_args
+ARGS=$*
+if [[ "$1" == --debug ]]; then DBG='on'; shift; fi
+if [[ "$1" == -[bru+] ]]; then FLAGS=$1; shift; fi
+
+FILTER=$*
+
+
+
+# TODO function: get_contexts
 CONTEXT_CURRENT=`task _get rc.context`
 CONTEXT=$CONTEXT_CURRENT
-# CONTEXT='rc.context:'$CONTEXT_CURRENT
 CONTEXT_LIST=`cat ~/.taskrc |grep ^context. | cut -d. -f2 | cut -d= -f1`
-#CONTEXT=work
-#TASKDATA
-# test for taskdata
 
 # function: get_candidates
 CANDIDATES=`$TASK tag.not:nosch rc.context:$CONTEXT $FILTER +READY $RPT_READY_UUID`
 CANDIDATES_COUNT=`$TASK tag.not:nosch rc.context:$CONTEXT $FILTER +READY count`
-CANDIDATES_LIMIT=12
-CAND_LIST_LIMIT=3
-# CANDIDATES_TEST=`$TASK $CANDIDATES ready`
-#CANDIDATES_COUNT=`$CANDIDATES count`
 
 # function: get_next_target
 TARGET_DATE_RANGE='sched.after:now'
 TARGETS=`$TASK $FILTER $TARGET_DATE_RANGE uuids`
-if [[ "$TARGETS" == '' ]]; then 
-    echo 'No targets found'; else
-TARGET_LIMIT=6
-TARGETS_COUNT=`$TASK $TARGETS count`
-TARGET_NEXT=`echo $TARGETS |cut -d' ' -f1`
-TARGET_NEXT_DESC=`$TASK $TARGET_NEXT $LIST_DESC`
-    fi
-# read +@context1 target tasks uuids
-#	sort:edate+
+TARGETS_COUNT=`task $FILTER +PENDING scheduled.after:now count`
+TARGET_ID=`task $FILTER +PENDING scheduled.after:now limit:1 ids`
+
+TARGET_ID=`cho $TARGETS |cut -d' ' -f1`
+# TARGET_NEXT_DESC=`$TASK $TARGET_NEXT $LIST_DESC`
+
+## COLORS
+declare -A title=([value]="[1;32m" [alt]="[38;5;10m[48;5;232m" [end]="[0m")
+    C1=${title[value]}  # bold green
+    C1a=${title[alt]}  # bold green on gray
+declare -A heading=([value]="[1;37m" [alt]="^[[38;5;242m" [end]="[0m")
+    C2=${heading[value]}  #bold white
+declare -A comment=([value]="[38;5;245m" [alt]="^[[38;5;242m" [end]="[0m")
+    C3=${comment[value]}  #gray13
+declare -A warning=([value]="[32;40m" [alt]="^[[38;5;242m" [end]="[0m")  # yellow
+    Cx=${title[end]}  #end color rule
+
+## Report
+### Header
 
     echo
-    echo -e ' <----- Taskwarrior Scheduling ----->' 
+    echo -e $C1' <----- Taskwarrior Scheduling ----->' $Cx
 #     if [[ "$MODE" == batch ]]; then 
 # 	echo '          Batch Mode'
 #     fi
-    echo -e '    '$READY_COUNT' ready of '$PENDING_COUNT' pending tasks'
+    echo -e $C3'   '$READY_COUNT' ready of '$PENDING_COUNT' pending tasks'$Cx
     #$SCHED_NONE_COUNT' unscheduled, '$SCHED_OLD_COUNT' stale' 
-    #echo -e ' Total pending tasks \t\t: '$PENDING_COUNT
     echo -e $DIVIDER
+
+### Context & Filter
+#### Context
 	if [[ "$CONTEXT_CURRENT" != '' ]]; then
 	    echo -e ' Context \t: '$CONTEXT_CURRENT
 	fi
-    echo -e ' Filter \t: '$FILTER
-    echo -e $DIVIDER
+
+#### Filter
+	if [[ "$FILTER" != '' ]]; then
+	    echo -e ' Filter \t: '$FILTER
+	    echo -e $DIVIDER
+	fi
+
+## No context or filter
+	if [[ "$BATCH_MODE" == on ]] && [[ "$CONTEXT_CURRENT" == '' ]] && [[ "$FILTER" == '' ]]; then
+	    echo -e ' This command has no filter or context'
+	    echo ' and would apply to ALL tasks,'
+	    echo -e ' so it has been disabled'
+	    echo -e ' USAGE'
+	    echo
+	    echo -e $DIVIDER
+	fi
     #echo -e ' Unscheduled tasks \t\t: '$SCHED_NONE_COUNT   
     #echo -e ' Tasks past scheduled date \t: '$SCHED_OLD_COUNT
     #echo -e $DIVIDER
-    echo -e ' '$CANDIDATES_COUNT' Candidates'
-	task rc.verbose:label rc.context:$CONTEXT $FILTER limit:$CAND_LIST_LIMIT sch-cand;
-    #echo -e `$TASK $CONTEXT $FILTER limit:3 ready`
-    if [[ "$CANDIDATES_COUNT" > $CAND_LIST_LIMIT ]]; then
-    echo -e '.. and CAND_BATCH_LIMIT - CAND_LIST_LIMIT more'; fi
+
+## Candidates list 
+if [[ "$BATCH_MODE" == off ]]; then
+    echo -e $C2' Next of '$CANDIDATES_COUNT' Candidates'$Cx
+    CAND_ID=`task rc.verbose=label rc.context:$CONTEXT $FILTER limit:1 ids`;
+    task rc.verbose=label rc.context:$CONTEXT $FILTER limit:1 sch_cand;
+elif [[ "$BATCH_MODE" == on ]]; then
+    echo -e $C2' '$CANDIDATES_COUNT' Candidates'$Cx
+	task rc.verbose=label rc.context:$CONTEXT $FILTER limit:$CAND_LIST_LIMIT sch_cand;
+    if [[ "$CANDIDATES_COUNT" -gt "$CAND_LIST_LIMIT" ]]; then
+	CAND_MORE=$(( $CANDIDATES_COUNT - $CAND_LIST_LIMIT ))
+    echo -e $C3' (and '$CAND_MORE' more) are matching, unscheduled tasks'$Cx; else
+    echo -e $C3' these are matching, unscheduled tasks'$Cx
+    fi
+fi
     echo -e $DIVIDER
+
+## Targets list
     if [[ "$TARGETS" == '' ]]; then
-	echo 'No targets found'; else
-	echo ' '$TARGETS_COUNT' Targets'
-	task rc.verbose:label rc.context:$CONTEXT $FILTER limit:$TARGET_LIMIT sch-target;
-    # echo -e 'and the next target is "'$TARGET_NEXT_DESC'"'
-	fi
-    echo 'Assign this target sched date? ( Y/n/q )'
+	echo -e ' No matching targets found'; else
+	echo $C2' '$TARGETS_COUNT' Targets'$Cx
+	task rc.verbose:label rc.context:$CONTEXT $FILTER limit:$TARGET_LIST_LIMIT sch_target;
+    fi
+    if [[ "$TARGETS_COUNT" -gt "$TARGET_LIST_LIMIT" ]]; then
+	TARGETS_MORE=$(( $TARGETS_COUNT - $TARGET_LIST_LIMIT ))
+	echo -e $C3' and '$TARGETS_MORE' more) are possible scheduling target dates'$Cx; 
+    fi
+	echo -e $DIVIDER
+    echo ' (enter target-ID#, date or "y" or "n" or "q"'
+    read -ep $C1' Schedule > '$Cx prompt
+if [[ "$prompt" == '' ]] && [[ "$TARGET_ID" == '' ]]; then
+    echo ' No targets found, please enter a date'
+    # TODO cycle prompt
+    elif [[ "$prompt" == '' ]] && [[ "$TARGET_ID" == [0-9] ]]; then
+    TASK_CMD='task '$CAND_ID' mod sched:'$CAND_ID'.scheduled'
+    echo $TASK_CMD
+    read -ep ' (Y/n)' conf_prompt
+	if [[ "$conf_prompt" == [yY] ]] || [[ "$conf_prompt" == '' ]]; then
+	$TASK_CMD
+	else echo ' action cancelled, no changes made'; exit 0; fi
+    fi
+    # elif prompt = [0-9]4'
+    # else prompt = 
+
+# TASK_CMD='task $CONTEXT $FILTER ..'
+    # echo ' $ task '$CONTEXT $FILTER' mod sched:TARGET_UUID.scheduled'
     echo
 
+## Debug
 if [[ "$DBG" == on ]]; then 
     echo '============DEBUG=============';
     echo 'version = '$TSCH_VERSION;
@@ -109,9 +193,5 @@ if [[ "$DBG" == on ]]; then
     echo 'CANDIDATES count = '$CANDIDATES_COUNT; 
     echo 'UNSCHEDULED count = '$SCHED_NONE_COUNT;
     echo '============ND DEBUG==========';
-# if [[ $DBG == on ]]; then echo 'CANDIDATES = '$CANDIDATES; fi
-# if [[ $DBG == on ]]; then echo 'CANDIDATES ready = '$CANDIDATES_TEST; fi
 fi
-
-# function: apply_sched
-# task $CANDIDATES mod sched:$NEXT_TARGET_DATE
+exit 0
