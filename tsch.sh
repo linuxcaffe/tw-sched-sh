@@ -44,7 +44,7 @@ fi
 ##################################################################################
 # Help Setup
 
-USAGE=<<EOT
+USAGE="
 USAGE
 
 ${0##*/} [-d] [-h] [-b] [-l <limit>] [-r] [-u] [-c context] [task filters]
@@ -66,9 +66,9 @@ at the Schedule > prompt;
     h[elp]          show this usage text
     q[uit]          exit without changes
 
-EOT
+"
 
-usage () { echo $USAGE ; echo "!!! $@" ; exit 1 ; }
+usage () { echo "$USAGE" ; echo -e "!!! $@" ; exit 1 ; }
 
 ##################################################################################
 # Option Handling
@@ -85,15 +85,20 @@ OPTIND=1 # This forces the index to 1. This isn't usually necessary, but I'm
 
 while getopts ":hdbl:ruc:" opt; do
   case "$opt" in
-    h) usage                 ;;
+    h) echo "$USAGE" ; exit  ;;
     d) DBG=1                 ;;
     b) BATCH_MODE=1          ;;
     l) BATCH_LIMIT=${OPTARG} ;;
     r) RESCHEDULE=1          ;;
     u) UNSCHEDULE=1          ;; 
     c) CONTEXT=${OPTARG}     ;;
+   \?) usage "Invalid option: ${OPTARG}"  ; exit ;;
+    :) usage "-${OPTARG} requires a value" ; exit ;;
+    *) echo "$USAGE" ; exit  ;;
   esac
 done
+
+shift "$(($OPTIND-1))"
 
 if [[ $RESCHEDULE -eq 1 && $UNSCHEDULE -eq 1 ]]; then
   usage "re-schedule-mode and un-schedule-mode are mutually exclusive"
@@ -104,13 +109,25 @@ if [[ -z $CONTEXT ]]; then
 elif [[ ${CONTEXT,,} == 'none' ]]; then
   CONTEXT=
   $TASK context none
-elif [[ -z $($TASK _context | grep $CONTEXT) ]]; then
-  usage "No such context $CONTEXT"
+elif [[ -z $($TASK _context | grep "^$CONTEXT$") ]]; then
+  usage "No such context '$CONTEXT'"
 else
   $TASK context $CONTEXT
 fi
 
 FILTER="$@"
+
+cat <<EOT
+        DBG: ${DBG}
+ BATCH_MODE: ${BATCH_MODE}
+BATCH_LIMIT: ${BATCH_LIMIT}
+ RESCHEDULE: ${RESCHEDULE}
+ UNSCHEDULE: ${UNSCHEDULE}
+    CONTEXT: ${CONTEXT}
+     FILTER: ${FILTER}
+EOT
+
+exit
 
 ##################################################################################
 # Variable Setup
