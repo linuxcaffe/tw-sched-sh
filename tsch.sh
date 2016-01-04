@@ -117,17 +117,17 @@ fi
 
 FILTER="$@"
 
-cat <<EOT
-        DBG: ${DBG}
- BATCH_MODE: ${BATCH_MODE}
-BATCH_LIMIT: ${BATCH_LIMIT}
- RESCHEDULE: ${RESCHEDULE}
- UNSCHEDULE: ${UNSCHEDULE}
-    CONTEXT: ${CONTEXT}
-     FILTER: ${FILTER}
-EOT
-
-exit
+#cat <<EOT
+#        DBG: ${DBG}
+# BATCH_MODE: ${BATCH_MODE}
+#BATCH_LIMIT: ${BATCH_LIMIT}
+# RESCHEDULE: ${RESCHEDULE}
+# UNSCHEDULE: ${UNSCHEDULE}
+#    CONTEXT: ${CONTEXT}
+#     FILTER: ${FILTER}
+#EOT
+#
+#exit
 
 ##################################################################################
 # Variable Setup
