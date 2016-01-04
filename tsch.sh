@@ -5,77 +5,145 @@
 # Distributed under terms of the MIT license.
 # An urgency-driven, context-aware scheduling script for taskwarrior
 
-## Vars global
 TSCH_VERSION='0.7'
-RC_INCLUDED=`task _get rc.sched.rc.included`
-if [[ "$RC_INCLUDED" != yes ]]; then echo -e '
+
+##################################################################################
+# Check Requirements
+
+TASK=$(command -v task)
+
+if [[ $? -ne 0 ]]; then
+  echo 'Unable to find task executable'
+  exit 1
+fi
+
+if [[ -n $TASKRC ]]; then
+  TASK_RC=$TASKRC
+elif [[ -f $HOME/.taskrc ]]; then
+  TASK_RC=$HOME/.taskrc
+else
+  echo 'Unable to find .taskrc'
+  exit 1
+fi
+
+TASK_VERSION=$(task _version)
+
+if [[ $($TASK _get rc.sched.rc.included) != 'yes' ]]; then
+  cat <<EOT
     it seems sched.rc is not found, or is somehow broken.
 
     try adding
     include ~/path/to/shed.rc
-    to your .taskrc file'
+    to your .taskrc file
+
+EOT
+
     exit 1
 fi
-USAGE=`echo -e '	USAGE
 
-tsch.sh [--debug] [-b[n]] [-r] [-u] [@:[context]] [task filters]
+##################################################################################
+# Help Setup
 
-    -b[n]       batch-mode. Use "n" to override default limit.
+USAGE=<<EOT
+USAGE
+
+${0##*/} [-d] [-h] [-b] [-l <limit>] [-r] [-u] [-c context] [task filters]
+
+    -h          this usage text
+    -d          debug mode
+    -b          batch-mode
+    -l limit    override default limite for batch-mode
     -r          re-schedule-mode, acts on sched:stale and +sch tags
     -u          un-schedule-mode, clear or reset currently scheduled tasks
-    @:[context] override current context, "@: " for none
+    -c context  use specified context (default is none)
     filters     any trailing arguments are passed as task filters
 
+    re-schedule-mode and un-schedule-mode are mutually exclusive
+
 at the Schedule > prompt;
-    ID [+|- offset]     eg; 142, 217 + 15min, 67 - 2hr, 123 + 2dy, etc
-    date        	including forms like: mon, eow, 11th, Jul10, etc
-    h[elp]      	show this usage text
-    q[uit]      	exit without changes'`
+    ID [+|- offset] eg; 142, 217 + 15min, 67 - 2hr, 123 + 2dy, etc
+    date            including forms like: mon, eow, 11th, Jul10, etc
+    h[elp]          show this usage text
+    q[uit]          exit without changes
+
+EOT
+
+usage () { echo $USAGE ; echo "!!! $@" ; exit 1 ; }
+
+##################################################################################
+# Option Handling
+
+DBG=0
+BATCH_MODE=0
+BATCH_LIMIT=$($TASK _get rc.sched.cand.list.limit)
+RESCHEDULE=0
+UNSCHEDULE=0
+CONTEXT_CURRENT=$($TASK _get rc.context)
+
+OPTIND=1 # This forces the index to 1. This isn't usually necessary, but I'm
+         # a belt and suspenders guy.
+
+while getopts ":hdbl:ruc:" opt; do
+  case "$opt" in
+    h) usage                 ;;
+    d) DBG=1                 ;;
+    b) BATCH_MODE=1          ;;
+    l) BATCH_LIMIT=${OPTARG} ;;
+    r) RESCHEDULE=1          ;;
+    u) UNSCHEDULE=1          ;; 
+    c) CONTEXT=${OPTARG}     ;;
+  esac
+done
+
+if [[ $RESCHEDULE -eq 1 && $UNSCHEDULE -eq 1 ]]; then
+  usage "re-schedule-mode and un-schedule-mode are mutually exclusive"
+fi
+
+if [[ -z $CONTEXT ]]; then
+  CONTEXT=$CONTEXT_CURRENT
+elif [[ ${CONTEXT,,} == 'none' ]]; then
+  CONTEXT=
+  $TASK context none
+elif [[ -z $($TASK _context | grep $CONTEXT) ]]; then
+  usage "No such context $CONTEXT"
+else
+  $TASK context $CONTEXT
+fi
+
+FILTER="$@"
+
+##################################################################################
+# Variable Setup
 
 WIDTH=90
-DBG=''
-TASK='task rc.verbose: rc.defaultwidth:'$WIDTH
-RPT_READY_UUID='rc.report.ready.columns=uuid rc.report.ready.labels= ready'
-# LIST_DESC='rc.report.list.columns=description,scheduled rc.report.list.labels= list'
-SCHED_NONE_COUNT=`$TASK +PENDING $FILTER +READY scheduled.none: count`
-SCHED_OLD_COUNT=`$TASK +PENDING $FILTER +READY scheduled.before:today count`
-PENDING_COUNT=`$TASK rc.context: +PENDING count`
-READY_COUNT=`$TASK rc.context: +READY +PENDING count`
-BATCH_MODE=off
-BATCH_LIMIT=`task _get rc.sched.cand.list.limit`
-CAND_LIST_LIMIT=`task _get rc.sched.cand.list.limit`
-TARGET_LIST_LIMIT=`task _get rc.sched.target.list.limit`
+TASK_OPTS="rc.verbose: rc.defaultwidth:${WIDTH}"
+
 DIVIDER='-------------------------------------'
 MODE='sched' # sched, resched, unsched
+RPT_READY_UUID='rc.report.ready.columns=uuid rc.report.ready.labels= ready'
 
+# LIST_DESC='rc.report.list.columns=description,scheduled rc.report.list.labels= list'
+#CONTEXT_LIST=$(grep ^context. $TASK_RC | cut -d '.' -f 2 | cut -d '=' -f 1)
 
-## Arguments
-# TODO function: parse_args
-ARGS=$*
-if [[ "$1" == --debug ]]; then DBG='on'; shift; fi
-if [[ "$1" == -[bru+] ]]; then FLAGS=$1; shift; fi
-
-FILTER=$*
-
-
-
-# TODO function: get_contexts
-CONTEXT_CURRENT=`task _get rc.context`
-CONTEXT=$CONTEXT_CURRENT
-CONTEXT_LIST=`cat ~/.taskrc |grep ^context. | cut -d. -f2 | cut -d= -f1`
+CAND_LIST_LIMIT=$($TASK $TASK_OPTS_get rc.sched.cand.list.limit)
+PENDING_COUNT=$($TASK $TASK_OPTSrc.context: +PENDING count)
+READY_COUNT=$($TASK $TASK_OPTSrc.context: +READY +PENDING count)
+SCHED_NONE_COUNT=$($TASK $TASK_OPTS+PENDING $FILTER +READY scheduled.none: count)
+SCHED_OLD_COUNT=$($TASK $TASK_OPTS+PENDING $FILTER +READY scheduled.before:today count)
+TARGET_LIST_LIMIT=$(task $TASK_OPTS_get rc.sched.target.list.limit)
 
 # function: get_candidates
-CANDIDATES=`$TASK tag.not:nosch rc.context:$CONTEXT $FILTER +READY $RPT_READY_UUID`
-CANDIDATES_COUNT=`$TASK tag.not:nosch rc.context:$CONTEXT $FILTER +READY count`
+CANDIDATES=$($TASK $TASK_OPTS tag.not:nosch rc.context:$CONTEXT $FILTER +READY $RPT_READY_UUID)
+CANDIDATES_COUNT=$($TASK $TASK_OPTS tag.not:nosch rc.context:$CONTEXT $FILTER +READY count)
 
 # function: get_next_target
 TARGET_DATE_RANGE='sched.after:now'
-TARGETS=`$TASK $FILTER $TARGET_DATE_RANGE uuids`
-TARGETS_COUNT=`task $FILTER +PENDING scheduled.after:now count`
-TARGET_ID=`task $FILTER +PENDING scheduled.after:now limit:1 ids`
+TARGETS=$($TASK $TASK_OPTS $FILTER $TARGET_DATE_RANGE uuids)
+TARGETS_COUNT=$(task $FILTER +PENDING scheduled.after:now count)
+TARGET_ID=$(task $FILTER +PENDING scheduled.after:now limit:1 ids)
 
-TARGET_ID=`cho $TARGETS |cut -d' ' -f1`
-# TARGET_NEXT_DESC=`$TASK $TARGET_NEXT $LIST_DESC`
+TARGET_ID=$(echo $TARGETS |cut -d' ' -f1)
+# TARGET_NEXT_DESC=`$TASK $TASK_OPTS $TARGET_NEXT $LIST_DESC`
 
 ## COLORS
 declare -A title=([value]="[1;32m" [alt]="[38;5;10m[48;5;232m" [end]="[0m")
