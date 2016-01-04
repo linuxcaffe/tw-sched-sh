@@ -142,12 +142,12 @@ RPT_READY_UUID='rc.report.ready.columns=uuid rc.report.ready.labels= ready'
 # LIST_DESC='rc.report.list.columns=description,scheduled rc.report.list.labels= list'
 #CONTEXT_LIST=$(grep ^context. $TASK_RC | cut -d '.' -f 2 | cut -d '=' -f 1)
 
-CAND_LIST_LIMIT=$($TASK $TASK_OPTS_get rc.sched.cand.list.limit)
-PENDING_COUNT=$($TASK $TASK_OPTSrc.context: +PENDING count)
-READY_COUNT=$($TASK $TASK_OPTSrc.context: +READY +PENDING count)
-SCHED_NONE_COUNT=$($TASK $TASK_OPTS+PENDING $FILTER +READY scheduled.none: count)
-SCHED_OLD_COUNT=$($TASK $TASK_OPTS+PENDING $FILTER +READY scheduled.before:today count)
-TARGET_LIST_LIMIT=$(task $TASK_OPTS_get rc.sched.target.list.limit)
+CAND_LIST_LIMIT=$($TASK $TASK_OPTS _get rc.sched.cand.list.limit)
+PENDING_COUNT=$($TASK $TASK_OPTS rc.context: +PENDING count)
+READY_COUNT=$($TASK $TASK_OPTS rc.context: +READY +PENDING count)
+SCHED_NONE_COUNT=$($TASK $TASK_OPTS +PENDING $FILTER +READY scheduled.none: count)
+SCHED_OLD_COUNT=$($TASK $TASK_OPTS +PENDING $FILTER +READY scheduled.before:today count)
+TARGET_LIST_LIMIT=$($TASK $TASK_OPTS _get rc.sched.target.list.limit)
 
 # function: get_candidates
 CANDIDATES=$($TASK $TASK_OPTS tag.not:nosch rc.context:$CONTEXT $FILTER +READY $RPT_READY_UUID)
