@@ -21,13 +21,17 @@ SCREENSHOT
 ```
 tsch.sh [--debug] [-b[n]] [-r] [-u] [@:[context]] [task filters]
 
-    -b[n]	batch-mode. Use "n" to override default limit.
+    -b 		batch-mode. Use "n" to override default limit.
+
+    -c context	override current context ('-c none' for no context)	
+    
+    -d		debug mode, spews various debug info
+
+    -l N	override batch-limit to N items
 
     -r		re-schedule-mode, acts on sched:stale and +sch tags
 
     -u		un-schedule-mode, clear or reset currently scheduled tasks
-
-    @:[context] override current context, "@: " for none
 
     filters	any trailing arguments are passed as task filters
 

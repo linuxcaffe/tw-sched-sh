@@ -12,7 +12,11 @@ sched.datefmt='a D b Y H:N'	# date format for target list
 ##===================================================================
 sched.rc.included=yes 		# used to test that this file is included
 
-
+report.sch_cand.description=Scheduling candidates, most urgent first
+report.sch_cand.columns=project,tags,description.count,urgency
+report.sch_cand.labels=Project,Tags,Description,Urgency
+report.sch_cand.filter=rc.verbose=label +PENDING +READY
+report.sch_cand.sort=urgency-,description+
 
 report.sch_target.description=Scheduling targets, soonest first
 report.sch_target.columns=id,scheduled,project,tags,description.desc
@@ -20,9 +24,4 @@ report.sch_target.labels=ID,Scheduled,Project,Tags,Description
 report.sch_target.filter=+PENDING scheduled.after:now
 report.sch_target.sort=scheduled+,project+,urgency-
 
-report.sch_cand.description=Scheduling candidates, most urgent first
-report.sch_cand.columns=project,tags,description.count,urgency
-report.sch_cand.labels=Project,Tags,Description,Urgency
-report.sch_cand.filter=rc.verbose=label +PENDING +READY
-report.sch_cand.sort=urgency-,description+
 
