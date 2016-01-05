@@ -3,29 +3,24 @@
 
 ## User configs;
 sched.tag=sch			# tag to mark tasks for (re)scheduling
-sched.batch.limit=10		# default max for batch-processing
-sched.cand.list.limit=5		# max candidates to list
-sched.target.list.limit=5	# max targets to list
+sched.batch.limit=12		# default max for batch-processing
+sched.cand.list.limit=6		# max candidates to list
+sched.target.list.limit=6	# max targets to list
 sched.datefmt=			# date format for target list
 
 ## don't edit willy-nilly below this line, you might break something!
 ##===================================================================
 sched.rc.included=yes 		# used to test that this file is included
 
-report.sch_target.description=list of scheduling targets, soonest first
+report.sch_target.description=Scheduling targets, soonest first
 report.sch_target.columns=id,scheduled,project,tags,description.desc
 report.sch_target.labels=ID,Scheduled,Project,Tags,Description
 report.sch_target.filter=+PENDING scheduled.after:now
 report.sch_target.sort=scheduled+,project+,urgency-
 
-report.sch_cand.description=list of scheduline candidates, most urgent first
+report.sch_cand.description=Scheduling candidates, most urgent first
 report.sch_cand.columns=project,tags,description.count,urgency
 report.sch_cand.labels=Project,Tags,Description,Urgency
 report.sch_cand.filter=rc.verbose=label +PENDING +READY
 report.sch_cand.sort=urgency-,description+
 
-report.sch_cand_uuid.description=UUIDs of scheduline candidates, most urgent first
-report.sch_cand_uuid.columns=uuid
-report.sch_cand_uuid.labels=
-report.sch_cand_uuid.filter=+PENDING +READY
-report.sch_cand_uuid.sort=
