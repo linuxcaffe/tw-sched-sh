@@ -108,11 +108,11 @@ if [[ -z $CONTEXT ]]; then
   CONTEXT=$CONTEXT_CURRENT
 elif [[ ${CONTEXT,,} == 'none' ]]; then
   CONTEXT=
-  $TASK context none
+#  $TASK context none
 elif [[ -z $($TASK _context | grep "^$CONTEXT$") ]]; then
   usage "No such context '$CONTEXT'"
-else
-  $TASK context $CONTEXT
+#else
+#  $TASK context $CONTEXT
 fi
 
 FILTER="$@"
@@ -137,11 +137,6 @@ TASK_OPTS="rc.verbose: rc.defaultwidth:${WIDTH}"
 
 DIVIDER='-------------------------------------'
 MODE='sched' # sched, resched, unsched
-#RPT_READY_UUID='rc.report.ready.columns=uuid rc.report.ready.labels= ready'
-
-# LIST_DESC='rc.report.list.columns=description,scheduled rc.report.list.labels= list'
-#CONTEXT_LIST=$(grep ^context. $TASK_RC | cut -d '.' -f 2 | cut -d '=' -f 1)
-
 CAND_LIST_LIMIT=$($TASK $TASK_OPTS _get rc.sched.cand.list.limit)
 CAND_COUNT=$($TASK $TASK_OPTS tag.not:nosch rc.context:$CONTEXT $FILTER +READY count)
 PENDING_COUNT=$($TASK $TASK_OPTS rc.context: +PENDING count)
@@ -150,15 +145,8 @@ SCHED_NONE_COUNT=$($TASK $TASK_OPTS +PENDING $FILTER +READY scheduled.none: coun
 SCHED_OLD_COUNT=$($TASK $TASK_OPTS +PENDING $FILTER +READY scheduled.before:today count)
 TARGET_LIST_LIMIT=$($TASK $TASK_OPTS _get rc.sched.target.list.limit)
 TARGETS_COUNT=$(task $FILTER +PENDING scheduled.after:now count)
-TARGET_NEXT_ID=$(task rc.report.sch_target.columns=id rc.report.sch_target.labels= limit:1 sch_target)
-
-# function: get_candidates
-#CAND=$($TASK $TASK_OPTS tag.not:nosch rc.context:$CONTEXT $FILTER +READY $RPT_READY_UUID)
-
-# function: get_next_target
-# TARGET_DATE_RANGE='sched.after:now'
-# TARGETS=$($TASK $TASK_OPTS $FILTER $TARGET_DATE_RANGE uuids)
-# TARGET_NEXT_DESC=`$TASK $TASK_OPTS $TARGET_NEXT $LIST_DESC`
+TARGET_NEXT_ID=$(task $TASK_OPTS rc.report.sch_target.columns=id rc.report.sch_target.labels= limit:1 sch_target)
+DATE_FMT=$(task _get rc.sched.datefmt)  #for target rpt
 
 ## COLORS
 declare -A title=([value]="[1;32m" [alt]="[38;5;10m[48;5;232m" [end]="[0m")
@@ -175,40 +163,44 @@ declare -A warning=([value]="[32;40m" [alt]="^[[38;5;242m" [end]="[0m")  # yel
 ### Header
 
     echo
-    echo -e $C1' <----- Taskwarrior Scheduling ----->' $Cx
-#     if [[ "$MODE" == batch ]]; then 
-# 	echo '          Batch Mode'
-#     fi
+    if [[ $RESCHEDULE -eq 1 && $BATCH_MODE -eq 1 ]]; then 
+	echo -e $C1' <----- Taskwarrior Batch Re-scheduling ----->' $Cx
+	elif [[ $RESCHEDULE -eq 1 && $BATCH_MODE -eq 0 ]]; then 
+	echo -e $C1' <----- Taskwarrior Re-scheduling ----->' $Cx
+	elif [[ $UNSCHEDULE -eq 1 && $BATCH_MODE -eq 1 ]]; then 
+	echo -e $C1' <----- Taskwarrior Batch Un-scheduling ----->' $Cx
+	elif [[ $UNSCHEDULE -eq 1 && $BATCH_MODE -eq 0 ]]; then 
+	echo -e $C1' <----- Taskwarrior Un-scheduling ----->' $Cx
+	elif [[ $BATCH_MODE -eq 1 ]]; then 
+	echo -e $C1' <----- Taskwarrior Batch Scheduling ----->' $Cx
+	else echo -e $C1' <----- Taskwarrior Scheduling ----->' $Cx
+    fi
     echo -e $C3'   '$READY_COUNT' ready of '$PENDING_COUNT' pending tasks'$Cx
     #$SCHED_NONE_COUNT' unscheduled, '$SCHED_OLD_COUNT' stale' 
-    echo -e $DIVIDER
 
 ### Context & Filter
 #### Context
-	if [[ "$CONTEXT_CURRENT" != '' ]]; then
-	    echo -e ' Context \t: '$CONTEXT_CURRENT
+    echo -e $DIVIDER
+	if [[ "$CONTEXT" != '' ]]; then
+	    echo -e ' Context \t: '$CONTEXT
 	fi
 
 #### Filter
 	if [[ "$FILTER" != '' ]]; then
 	    echo -e ' Filter \t: '$FILTER
-	    echo -e $DIVIDER
 	fi
 
 #### No context or filter
-	if [[ "$BATCH_MODE" == on ]] && [[ "$CONTEXT_CURRENT" == '' ]] && [[ "$FILTER" == '' ]]; then
-	    echo -e ' This command has no filter or context'
-	    echo ' and would apply to ALL tasks,'
-	    echo -e ' so it has been disabled'
-	    echo -e ' USAGE'
-	    echo
-	    echo -e $DIVIDER
+	if [[ "$BATCH_MODE" == 1 ]] && [[ "$CONTEXT_CURRENT" == '' ]] && [[ "$FILTER" == '' ]]; then
+	    echo -e ' No filters or context'
 	fi
+    
     #echo -e ' Unscheduled tasks \t\t: '$SCHED_NONE_COUNT   
     #echo -e ' Tasks past scheduled date \t: '$SCHED_OLD_COUNT
     #echo -e $DIVIDER
 
 ## Candidates list 
+	    echo -e $DIVIDER
 if [[ "$BATCH_MODE" == 0 ]]; then
     if [[ $CAND_COUNT == '0' ]]; then
 	echo -e ' No tasks match! Try changing the context or filter'
@@ -230,10 +222,10 @@ fi
     echo -e $DIVIDER
 
 ## Targets list
-    if [[ "$TARGETS" == '' ]]; then
+    if [[ "$TARGETS_COUNT" == '' ]]; then
 	echo -e ' No matching targets found'; else
 	echo $C2' '$TARGETS_COUNT' Targets'$Cx
-	task rc.verbose:label rc.context:$CONTEXT $FILTER limit:$TARGET_LIST_LIMIT sch_target;
+	task rc.verbose:label rc.context:$CONTEXT $FILTER limit:$TARGET_LIST_LIMIT rc.dateformat.report='a, b D, H:n' sch_target;
     fi
     if [[ "$TARGETS_COUNT" -gt "$TARGET_LIST_LIMIT" ]]; then
 	TARGETS_MORE=$(( $TARGETS_COUNT - $TARGET_LIST_LIMIT ))
@@ -256,10 +248,6 @@ elif [[ "$prompt" == '' ]] && [[ "$TARGET_NEXT_ID" = [0-9]+ ]]; then
 fi
     # elif prompt = [0-9]4'
     # else prompt = 
-
-# TASK_CMD='task $CONTEXT $FILTER ..'
-    # echo ' $ task '$CONTEXT $FILTER' mod sched:TARGET_UUID.scheduled'
-    echo
 
 ## Debug
 if [[ "$DBG" == on ]]; then 

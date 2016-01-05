@@ -6,11 +6,13 @@ sched.tag=sch			# tag to mark tasks for (re)scheduling
 sched.batch.limit=12		# default max for batch-processing
 sched.cand.list.limit=6		# max candidates to list
 sched.target.list.limit=6	# max targets to list
-sched.datefmt=			# date format for target list
+sched.datefmt='a D b Y H:N'	# date format for target list
 
 ## don't edit willy-nilly below this line, you might break something!
 ##===================================================================
 sched.rc.included=yes 		# used to test that this file is included
+
+
 
 report.sch_target.description=Scheduling targets, soonest first
 report.sch_target.columns=id,scheduled,project,tags,description.desc
