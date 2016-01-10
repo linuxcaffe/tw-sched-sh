@@ -42,8 +42,9 @@ EOT
 fi
 
 TASK_OPTS="rc.verbose: rc.defaultwidth:90"
-
 DIVIDER='-------------------------------------'
+DATA_DIR=$($TASK _get rc.data.location)
+LOGFILE="${DATA_DIR/\~/$HOME}/$(basename $0).log"
 
 ##################################################################################
 # Help Setup
@@ -89,10 +90,13 @@ at the Schedule > prompt;
 
 
 BOLD=$(tput bold)
-GREEN_FG=$(tput setaf 2)
-WHITE_FG=$(tput setaf 7)
-BLACK_FG=$(tput setaf 0)
 RESET=$(tput sgr0)
+
+BLACK_FG=$(tput setaf 0)
+GREEN_BG=$(tput setab 2)
+GREEN_FG=$(tput setaf 2)
+RED_BG=$(tput setab 1)
+WHITE_FG=$(tput setaf 7)
 
 ##################################################################################
 # Functions
@@ -107,43 +111,75 @@ RESET=$(tput sgr0)
 # you want.
 #
 # NOTREALLY is used for debugging and dry-runs.
-#
-#logit { echo "${LOGIT_PREFIX} $@" >> $LOGFILE ; }
-#
-#runit {
-#  logit "$@"
-#  $NOTREALLY "$@" >> $LOGFILE
-#
-#  if [[ $? -ne 0 ]]; then
-#    echo "Error executing call, exiting"
-#    exit 1
-#  fi
-#}
-#
-# Something like the below to handle task calls
-#
-# task { runit $TASK $TASK_OPTS "$@" ; }
+
+logit () { echo "${LOGIT_PREFIX}$@" >> $LOGFILE ; }
+
+runit () {
+  logit "$@"
+  $NOTREALLY "$@" 2>> $LOGFILE
+
+  if [[ $? -ne 0 ]]; then
+    echo "Error executing call, exiting"
+    exit 1
+  fi
+}
+
+task () { runit $TASK "$@" ; }
 
 usage () { echo "$USAGE" ; echo -e "!!! $@" ; exit 1 ; }
 
+__rc_context   () { task _get rc.context ; }
+__context_text () { echo ${CONTEXT:=None} ; }
+__filter_text  () { echo ${FILTER:=None}  ; }
+
+__batch_limit          () { task _get rc.verbose=nothing rc.sched.batch.limit       ; }
+__candidate_list_limit () { task _get rc.verbose=nothing rc.sched.cand.list.limit   ; }
+__sched_datefmt        () { task _get rc.verbose=nothing rc.sched.datefmt           ; }
+__sched_tag            () { task _get rc.verbose=nothing rc.sched.tag               ; }
+__target_list_limit    () { task _get rc.verbose=nothing rc.sched.target.list.limit ; }
+
+__candidate_list () { task rc.verbose=label limit:1 rc.context:$CONTEXT $FILTER sch_cand                        ; }
+__target_list    () { task rc.verbose=label limit:$(__target_list_limit) rc.context:$CONTEXT $FILTER sch_target ; }
+
 # XXX: Are ready and pending counts supposed to have no context?
 
-__rc_context    () { $TASK _get rc.context ; }
+__candidate_count     () { task rc.verbose=nothing tag.not:nosch rc.context:$CONTEXT +READY $FILTER count ; }
+__pending_count       () { task rc.verbose=nothing rc.context: +PENDING count                             ; }
+__ready_count         () { task rc.verbose=nothing rc.context: +PENDING +READY count                      ; }
+#__schedule_none_count () { task rc.verbose=nothing +PENDING +READY $FILTER scheduled.none: count          ; }
+#__schedule_old_count  () { task rc.verbose=nothing +PENDING +READY $FILTER scheduled.before:today count   ; }
+__target_count        () { task rc.verbose=nothing +PENDING $FILTER scheduled.after:now count             ; }
 
-__candidate_count     () { $TASK $TASK_OPTS tag.not:nosch rc.context:$CONTEXT $FILTER +READY count ; }
-__pending_count       () { $TASK $TASK_OPTS rc.context: +PENDING count                             ; }
-__ready_count         () { $TASK $TASK_OPTS rc.context: +READY +PENDING count                      ; }
-__schedule_none_count () { $TASK $TASK_OPTS +PENDING $FILTER +READY scheduled.none: count          ; }
-__schedule_old_count  () { $TASK $TASK_OPTS +PENDING $FILTER +READY scheduled.before:today count   ; }
-__target_count        () { $TASK $TASK_OPTS $FILTER +PENDING scheduled.after:now count             ; }
+__target_next_id () {
 
-__candidate_list_limit () { $TASK $TASK_OPTS _get rc.sched.cand.list.limit   ; }
-__target_list_limit    () { $TASK $TASK_OPTS _get rc.sched.target.list.limit ; }
+  local options
+  options="${options} $TASK_OPTS"
+  options="${options} rc.verbose=nothing"
+  options="${options} rc.column.padding=0"
+  options="${options} rc.report.target_id.columns=id"
+  options="${options} rc.report.target_id.filter=$(task _get rc.report.sch_target.filter)"
+  options="${options} rc.report.target_id.sort=$(task _get rc.report.sch_target.sort)"
+  options="${options} limit:1"
+  options="${options} target_id"
 
-__target_next_id () { $TASK $TASK_OPTS rc.report.sch_target.columns=id rc.report.sch_target.labels= limit:1 sch_target ; }
+  printf '%s' $(task $options)
 
-__context_text  () { echo ${CONTEXT:=None} ; }
-__filter_text   () { echo ${FILTER:=None}  ; }
+}
+
+__candidate_next_id () {
+
+  local options
+  options="${options} rc.verbose:nothing"
+  options="${options} rc.column.padding=0"
+  options="${options} rc.report.cand_id.columns=id"
+  options="${options} rc.report.cand_id.filter=$(task _get rc.report.sch_cand.filter)"
+  options="${options} rc.report.cand_id.sort=$(task _get rc.report.sch_cand.sort)"
+  options="${options} limit:1"
+  options="${options} cand_id"
+
+  printf '%s' $(task $options)
+
+}
 
 __schedule_text () {
 
@@ -183,21 +219,34 @@ $DIVIDER"
 candidates_list () {
 
   CANDIDATE_COUNT=$(__candidate_count)
-  CANDIDATE_LIST_LIMIT=$(__candidate_list_limit)
 
   if [[ $BATCH_MODE -eq 0 ]]; then
     if [[ $CANDIDATE_COUNT -eq 0 ]]; then
       echo -e ' No tasks match! Try changing the context or filter'
       exit 1
+
     else
-      echo -e "${BOLD}${GREEN_FG} Next of ${CANDIDATE_COUNT} Candidates${RESET}\n"
-      $TASK rc.verbose=label rc.report.sch_cand.columns=project,tags,description,urgency rc.context:$CONTEXT $FILTER limit:1 sch_cand;
+      echo -e "${BOLD}${GREEN_FG} Next of ${CANDIDATE_COUNT} Candidates${RESET}
+
+$(__candidate_list)"
+
     fi
 
   else
+
+    CANDIDATE_LIST_LIMIT=$(__candidate_list_limit)
+
     echo -e "${BOLD}${GREEN_FG} ${CANDIDATE_COUNT} Candidates${RESET}\n"
-    $TASK rc.verbose=label rc.context:$CONTEXT $FILTER limit:$CANDIDATE_LIST_LIMIT sch_cand;
+    task rc.verbose=label rc.context:$CONTEXT $FILTER limit:$CANDIDATE_LIST_LIMIT sch_cand;
     echo
+
+    if [[ $CANDIDATE_COUNT -gt $BATCH_LIMIT ]]; then
+      echo -e "
+  ${CANDIDATE_COUNT} tasks is over the batch-limit of ${BATCH_LIMIT}
+  ${BOLD}${BLACK_FG}  try changing the filter and/or context,
+    or override with '-l N', or change it in sched.rc${RESET}"
+      exit 1
+    fi
 
     if [[ $CANDIDATE_COUNT -gt $CANDIDATE_LIST_LIMIT ]]; then
       CAND_MORE=$(( $CANDIDATE_COUNT - $CANDIDATE_LIST_LIMIT ))
@@ -207,26 +256,22 @@ candidates_list () {
     fi
   fi
 
-  echo -e "\n$DIVIDER"
-
 }
 
 targets_list () {
 
   TARGET_COUNT=$(__target_count)
-  CANDIDATE_COUNT=$(__candidate_count)
   TARGET_LIST_LIMIT=$(__target_list_limit)
 
-  # TODO fix the following:
-  #DATE_FMT=rc.dateformat.report=\'$($TASK _get rc.sched.datefmt)\'  #for target rpt
+  echo -e "\n$DIVIDER"
 
   if [[ $TARGET_COUNT -eq 0 ]]; then
     echo -e ' No matching targets found';
   else
-    echo "${BOLD}${WHITE_FG} ${TARGET_COUNT} Targets${RESET}"
-  #  task rc.verbose:label rc.context:$CONTEXT $FILTER limit:$TARGET_LIST_LIMIT $DATE_FMT sch_target;
-  #  task rc.verbose:label rc.context:$CONTEXT $FILTER limit:$TARGET_LIST_LIMIT rc.dateformat.report='a, b D, H:n' sch_target;
-    $TASK rc.verbose:label rc.context:$CONTEXT $FILTER limit:$TARGET_LIST_LIMIT sch_target;
+    echo " ${BOLD}${GREEN_FG}${TARGET_COUNT} Targets${RESET}
+
+$(__target_list)
+"
   fi
 
   if [[ $TARGET_COUNT -gt $TARGET_LIST_LIMIT ]]; then
@@ -234,26 +279,12 @@ targets_list () {
     echo -e "${BOLD}${BLACK_FG} (and ${TARGETS_MORE} more) are possible scheduling target dates${RESET}"
   fi
 
-  echo -e $DIVIDER
-
-  if [[ $BATCH_MODE -eq 1 && $CANDIDATE_COUNT -gt $BATCH_LIMIT ]]; then
-    echo -e "
-  ${CANDIDATE_COUNT} tasks is over the batch-limit of ${BATCH_LIMIT}
-  ${BOLD}${BLACK_FG}  try changing the filter and/or context,
-    or override with '-l N', or change it in sched.rc${RESET}"
-    exit 1
-  fi
-
-  if [[ $TARGET_COUNT -gt 0 ]]; then
-    echo -e "${BOLD}${BLACK_FG}   ID   [+|- offset]  eg: 142, 123 - 2dy, 234 + 2hr, 113 - 1wk${RESET}"
-  fi
-
 }
 
-hint_text () {
+hint_text () { echo -e "$DIVIDER
 
-  echo -e "
-   ${BOLD}${BLACK_FG}date [+|- offset]  eg: mon, 15th, eom - 2dy, tomorrow + 14hr
+   ${BOLD}${BLACK_FG}ID   [+|- offset]  eg: 142, 123 - 2dy, 234 + 2hr, 113 - 1wk
+   date [+|- offset]  eg: mon, 15th, eom - 2dy, tomorrow + 14hr
    h[elp]    display USAGE text
    q[uit]    quit without changes${RESET}
 "
@@ -264,18 +295,19 @@ run_task_command () {
   PROMPT="$@"
   TARGET_NEXT_ID=$(__target_next_id)
 
-  if [[ -z $PROMPT ]] && [[ -z $TARGET ]]; then
-    echo ' No targets found, please enter a date'
+  if [[ -z $PROMPT ]] && [[ -z $TARGET_NEXT_ID ]]; then
+    echo -e "\n ${RED_BG}No targets found, please enter a date or date offset.${RESET}\n"
 
-  elif [[ -z $PROMPT ]] && [[ $TARGET_NEXT_ID == [0-9]+ ]]; then
-    TASK_CMD=$(logit $TASK $CANDIDATE_ID mod sched:${CANDIDATE_ID}.scheduled)
-    echo $TASK_CMD
-    read -n 1 -ep ' (Y/n) ' confirm
+  elif [[ -z $PROMPT ]] && [[ $TARGET_NEXT_ID =~ [0-9]+ ]]; then
+    TASK_CMD="${SCHEDULE_WHAT} mod sched:${TARGET_NEXT_ID}.scheduled"
+
+    echo
+    read -n 1 -ep " ${GREEN_BG}task ${TASK_CMD}${RESET} (Y/n) " confirm
 
     if [[ -z $confirm ]] || [[ $confirm == [Yy] ]]; then
-      $TASK_CMD
+      task $TASK_CMD
     else
-      echo ' action cancelled, no changes made'
+      echo -e "\n ${RED_BG}action cancelled, no changes made${RESET}\n"
     fi
   fi
 
@@ -286,7 +318,7 @@ run_task_command () {
 
 DBG=0
 BATCH_MODE=0
-BATCH_LIMIT=$($TASK _get rc.sched.batch.limit)
+BATCH_LIMIT=$(__batch_limit)
 RESCHEDULE=0
 UNSCHEDULE=0
 
@@ -344,7 +376,9 @@ candidates_list
 targets_list
 hint_text
 
-while read -ep "${BOLD}${GREEN_FG} Schedule > ${RESET}" prompt; do
+SCHEDULE_WHAT=$(__candidate_next_id)
+
+while read -ep " ${BOLD}${GREEN_FG}Schedule ${SCHEDULE_WHAT} >${RESET} " prompt; do
   history -s "$prompt"
 
   case "$prompt" in
