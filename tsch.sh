@@ -153,11 +153,12 @@ __target_next_id () {
   local options
   options="${options} $TASK_OPTS"
   options="${options} rc.verbose=nothing"
-  options="${options} rc.column.padding=0"
+  options="${options} rc.context:$CONTEXT"
   options="${options} rc.report.target_id.columns=id"
   options="${options} rc.report.target_id.filter=$(task _get rc.report.sch_target.filter)"
   options="${options} rc.report.target_id.sort=$(task _get rc.report.sch_target.sort)"
-  options="${options} limit:1"
+  options="${options} limit=1"
+  options="${options} $FILTER"
   options="${options} target_id"
 
   printf '%s' $(task $options)
@@ -167,12 +168,13 @@ __target_next_id () {
 __candidate_next_id () {
 
   local options
-  options="${options} rc.verbose:nothing"
-  options="${options} rc.column.padding=0"
+  options="${options} rc.verbose=nothing"
+  options="${options} rc.context=$CONTEXT"
   options="${options} rc.report.cand_id.columns=id"
   options="${options} rc.report.cand_id.filter=$(task _get rc.report.sch_cand.filter)"
   options="${options} rc.report.cand_id.sort=$(task _get rc.report.sch_cand.sort)"
-  options="${options} limit:1"
+  options="${options} limit=1"
+  options="${options} $FILTER"
   options="${options} cand_id"
 
   printf '%s' $(task $options)
