@@ -146,8 +146,6 @@ __target_list    () { task rc.verbose=label limit:$(__target_list_limit) rc.cont
 __candidate_count     () { task rc.verbose=nothing tag.not:nosch rc.context:$CONTEXT +READY $FILTER count ; }
 __pending_count       () { task rc.verbose=nothing rc.context: +PENDING count                             ; }
 __ready_count         () { task rc.verbose=nothing rc.context: +PENDING +READY count                      ; }
-#__schedule_none_count () { task rc.verbose=nothing +PENDING +READY $FILTER scheduled.none: count          ; }
-#__schedule_old_count  () { task rc.verbose=nothing +PENDING +READY $FILTER scheduled.before:today count   ; }
 __target_count        () { task rc.verbose=nothing +PENDING $FILTER scheduled.after:now count             ; }
 
 __target_next_id () {

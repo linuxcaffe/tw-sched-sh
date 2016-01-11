@@ -1,0 +1,7 @@
+notes.txt
+
+:Author: djp
+:Email: djp@transit
+:Date: 2016-01-05 13:52
+
+task commands | grep report | grep Filt | cut -f1 -d' '
