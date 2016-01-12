@@ -41,7 +41,7 @@ EOT
     exit 1
 fi
 
-TASK_OPTS="rc.verbose: rc.defaultwidth:90"
+TASK_OPTS="rc.defaultwidth=90"
 DIVIDER='-------------------------------------'
 DATA_DIR=$($TASK _get rc.data.location)
 LOGFILE="${DATA_DIR/\~/$HOME}/$(basename $0).log"
@@ -113,20 +113,9 @@ WHITE_FG=$(tput setaf 7)
 # NOTREALLY is used for debugging and dry-runs.
 
 logit () { echo "${LOGIT_PREFIX}$@" >> $LOGFILE ; }
-
-runit () {
-  logit "$@"
-  $NOTREALLY "$@" 2>> $LOGFILE
-
-  if [[ $? -ne 0 ]]; then
-    echo "Error executing call, exiting"
-    exit 1
-  fi
-}
-
-task () { runit $TASK "$@" ; }
-
-usage () { echo "$USAGE" ; echo -e "!!! $@" ; exit 1 ; }
+runit () { logit "$@" ; $NOTREALLY "$@" 2>> $LOGFILE ; }
+task  () { runit $TASK $TASK_OPTS "$@" ; }
+usage () { echo "$USAGE" ; echo -e "${RED_BG} !!! $@${RESET}" ; exit 1 ; }
 
 __rc_context   () { task _get rc.context ; }
 __context_text () { echo ${CONTEXT:=None} ; }
@@ -138,44 +127,105 @@ __sched_datefmt        () { task _get rc.verbose=nothing rc.sched.datefmt       
 __sched_tag            () { task _get rc.verbose=nothing rc.sched.tag               ; }
 __target_list_limit    () { task _get rc.verbose=nothing rc.sched.target.list.limit ; }
 
-__candidate_list () { task rc.verbose=label limit:1 rc.context:$CONTEXT $FILTER sch_cand                        ; }
-__target_list    () { task rc.verbose=label limit:$(__target_list_limit) rc.context:$CONTEXT $FILTER sch_target ; }
-
 # XXX: Are ready and pending counts supposed to have no context?
+# XXX: Shouldn't candidate and target counts use the same context and filter?
 
 __candidate_count     () { task rc.verbose=nothing tag.not:nosch rc.context:$CONTEXT +READY $FILTER count ; }
 __pending_count       () { task rc.verbose=nothing rc.context: +PENDING count                             ; }
 __ready_count         () { task rc.verbose=nothing rc.context: +PENDING +READY count                      ; }
 __target_count        () { task rc.verbose=nothing +PENDING $FILTER scheduled.after:now count             ; }
 
-__target_next_id () {
+__target_ () {
 
+  reqtype=$1
+  shift
+
+  local task_command
   local options
-  options="${options} $TASK_OPTS"
-  options="${options} rc.verbose=nothing"
-  options="${options} rc.column.padding=0"
-  options="${options} rc.report.target_id.columns=id"
-  options="${options} rc.report.target_id.filter=$(task _get rc.report.sch_target.filter)"
-  options="${options} rc.report.target_id.sort=$(task _get rc.report.sch_target.sort)"
-  options="${options} limit:1"
-  options="${options} target_id"
+  local useprintf
 
-  printf '%s' $(task $options)
+  options="${options} $TASK_OPTS"
+  useprintf=
+
+  if [[ "$reqtype" ==  '' ]]; then
+    echo "${RED_BG} ${FUNCNAME} needs to know list or id"
+    exit 1
+
+  elif [[ "$reqtype" == 'list' ]]; then
+    task_command='sch_target'
+    useprintf='yes'
+    options="${options} rc.verbose=label"
+    options="${options} limit=$(__target_list_limit)"
+
+  elif [[ "$reqtype" == 'id' ]]; then
+    task_command='target_id'
+    options="${options} rc.report.target_id.columns=id"
+    options="${options} rc.report.target_id.filter=$(task _get rc.report.sch_target.filter)"
+    options="${options} rc.report.target_id.sort=$(task _get rc.report.sch_target.sort)"
+    options="${options} rc.verbose=nothing"
+    options="${options} limit=1"
+
+  else
+    echo "${RED_BG} Unknown request type $reqtype"
+    exit
+
+  fi
+
+  [[ -n $CONTEXT ]] && options="${options} rc.context=$CONTEXT"
+  [[ -n $FILTER ]]  && options="${options} $FILTER"
+
+  if [[ -n $useprintf ]]; then
+    printf '%s' $(task $options $task_command)
+  else
+    task $options $task_command
+  fi
 
 }
 
-__candidate_next_id () {
+__candidate_ () {
 
+  reqtype=$1
+  shift
+
+  local task_command
   local options
-  options="${options} rc.verbose:nothing"
-  options="${options} rc.column.padding=0"
-  options="${options} rc.report.cand_id.columns=id"
-  options="${options} rc.report.cand_id.filter=$(task _get rc.report.sch_cand.filter)"
-  options="${options} rc.report.cand_id.sort=$(task _get rc.report.sch_cand.sort)"
-  options="${options} limit:1"
-  options="${options} cand_id"
+  local useprintf
 
-  printf '%s' $(task $options)
+  options="${options} $TASK_OPTS"
+  useprintf=
+
+  if [[ "$reqtype" == '' ]]; then
+    echo "${RED_BG} ${FUNCNAME} needs to know list or id"
+    exit 1
+
+  elif [[ "$reqtype" == 'list' ]]; then
+    task_command='sch_cand'
+    options="${options} rc.verbose=label"
+
+  elif [[ "$reqtype" == 'id' ]]; then
+    task_command='cand_id'
+    useprintf='yes'
+    options="${options} rc.verbose=nothing"
+    options="${options} rc.report.cand_id.columns=id"
+    options="${options} rc.report.cand_id.filter=$(task _get rc.report.sch_cand.filter)"
+    options="${options} rc.report.cand_id.sort=$(task _get rc.report.sch_cand.sort)"
+
+  else
+    echo "${RED_BG} Unknown request type $reqtype"
+    exit
+
+  fi
+
+  options="${options} limit=1"
+
+  [[ -n $CONTEXT ]] && options="${options} rc.context=$CONTEXT"
+  [[ -n $FILTER ]]  && options="${options} $FILTER"
+
+  if [[ -n $useprintf ]]; then
+    printf "%s" $(task $options $task_command)
+  else
+    task $options $task_command
+  fi
 
 }
 
@@ -220,13 +270,13 @@ candidates_list () {
 
   if [[ $BATCH_MODE -eq 0 ]]; then
     if [[ $CANDIDATE_COUNT -eq 0 ]]; then
-      echo -e ' No tasks match! Try changing the context or filter'
+      echo -e "${RED_BG} No tasks match! Try changing the context or filter.${RESET}"
       exit 1
 
     else
       echo -e "${BOLD}${GREEN_FG} Next of ${CANDIDATE_COUNT} Candidates${RESET}
 
-$(__candidate_list)"
+$(__candidate_ list)"
 
     fi
 
@@ -268,7 +318,7 @@ targets_list () {
   else
     echo " ${BOLD}${GREEN_FG}${TARGET_COUNT} Targets${RESET}
 
-$(__target_list)
+$(__target_ list)
 "
   fi
 
@@ -278,6 +328,8 @@ $(__target_list)
   fi
 
 }
+
+# XXX: The ID line should only show if there are targets.
 
 hint_text () { echo -e "$DIVIDER
 
@@ -291,7 +343,7 @@ hint_text () { echo -e "$DIVIDER
 run_task_command () {
 
   PROMPT="$@"
-  TARGET_NEXT_ID=$(__target_next_id)
+  TARGET_NEXT_ID=$(__target_ id)
 
   if [[ -z $PROMPT ]] && [[ -z $TARGET_NEXT_ID ]]; then
     echo -e "\n ${RED_BG}No targets found, please enter a date or date offset.${RESET}\n"
@@ -327,7 +379,8 @@ while getopts ":hdbl:ruc:" opt; do
   case "$opt" in
     h) echo "$USAGE" ; exit  ;;
     d) DBG=1                 ;;
-    b) BATCH_MODE=1          ;;
+#    b) BATCH_MODE=1          ;;
+    b) echo "Batch mode not supported yet" ; exit ;;
     l) BATCH_LIMIT=${OPTARG} ;;
     r) RESCHEDULE=1          ;;
     u) UNSCHEDULE=1          ;;
@@ -374,7 +427,7 @@ candidates_list
 targets_list
 hint_text
 
-SCHEDULE_WHAT=$(__candidate_next_id)
+SCHEDULE_WHAT=$(__candidate_ id)
 
 while read -ep " ${BOLD}${GREEN_FG}Schedule ${SCHEDULE_WHAT} >${RESET} " prompt; do
   history -s "$prompt"
