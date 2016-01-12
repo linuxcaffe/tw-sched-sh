@@ -305,7 +305,7 @@ run_task_command () {
     read -n 1 -ep " ${GREEN_BG}task ${TASK_CMD}${RESET} (Y/n) " confirm
 
     if [[ -z $confirm ]] || [[ $confirm == [Yy] ]]; then
-      task rc.bulk=$(__batch_limit) $TASK_CMD
+      task rc.bulk=$(__batch_limit) rc.recurrence.confirmation=no $TASK_CMD
     else
       echo -e "\n ${RED_BG}action cancelled, no changes made${RESET}\n"
     fi
