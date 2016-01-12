@@ -19,7 +19,7 @@ SCREENSHOT
 ### Usage 
 
 ```
-tsch.sh [--debug] [-b[n]] [-r] [-u] [@:[context]] [task filters]
+tsch.sh [-b] [-c context] [-d] [-h] [-l limit] [-r] [-u] [task filters]
 
     -b 		batch-mode. Use "n" to override default limit.
 
