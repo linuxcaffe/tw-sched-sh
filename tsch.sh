@@ -138,8 +138,8 @@ __sched_datefmt        () { task _get rc.verbose=nothing rc.sched.datefmt       
 __sched_tag            () { task _get rc.verbose=nothing rc.sched.tag               ; }
 __target_list_limit    () { task _get rc.verbose=nothing rc.sched.target.list.limit ; }
 
-__candidate_list () { task rc.verbose=label limit:1 rc.context:$CONTEXT $FILTER sch_cand                        ; }
-__target_list    () { task rc.verbose=label limit:$(__target_list_limit) rc.context:$CONTEXT $FILTER sch_target ; }
+__candidate_list () { task rc._forcecolor=on rc.verbose=label limit:1 rc.context:$CONTEXT $FILTER sch_cand                        ; }
+__target_list    () { task rc._forcecolor=on rc.verbose=label limit:$(__target_list_limit) rc.context:$CONTEXT $FILTER sch_target ; }
 
 # XXX: Are ready and pending counts supposed to have no context?
 
