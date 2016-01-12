@@ -189,7 +189,6 @@ __candidate_ () {
 
   local task_command
   local options
-<<<<<<< HEAD
   local useprintf
 
   options="${options} $TASK_OPTS"
