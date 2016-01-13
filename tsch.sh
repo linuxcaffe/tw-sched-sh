@@ -191,7 +191,7 @@ __candidate_ () {
   local options
   local useprintf
 
-  options="${options} $TASK_OPTS"
+  options="${options} $TASK_OPTS tag.not=nosch"
   useprintf=
 
   if [[ "$reqtype" == '' ]]; then
@@ -345,20 +345,55 @@ run_task_command () {
   PROMPT="$@"
   TARGET_NEXT_ID=$(__target_ id)
 
-  if [[ -z $PROMPT ]] && [[ -z $TARGET_NEXT_ID ]]; then
+  # Schedule cand_id > prompt == ^-            target_next == [0-9]+ error and prompt
+  # Schedule cand_id > prompt == ^-            target_next == ''     error and prompt
+  # Schedule cand_id > prompt == ''            target_next == ''     error and prompt
+  # Schedule cand_id > prompt == ''            target_next == [0-9]+ task cand_id mod sched:$target_next.scheduled
+
+  if [[ -n $TARGET_NEXT_ID ]] && [[ ! $TARGET_NEXT_ID =~ [0-9]+ ]]; then
+    echo "${RED_BG}!!! Do not know how to handle non-numeric TARGET_NEXT_ID ${TARGET_NEXT_ID} result${RESET}"
+    exit 1
+
+  elif [[ $PROMPT =~ ^- ]]; then
+    echo "${RED_BG}!!! Past dates are invalid.${RESET}"
+    exit 1
+
+  elif [[ -z $PROMPT ]] && [[ -z $TARGET_NEXT_ID ]]; then
     echo -e "\n ${RED_BG}No targets found, please enter a date or date offset.${RESET}\n"
 
   elif [[ -z $PROMPT ]] && [[ $TARGET_NEXT_ID =~ [0-9]+ ]]; then
-    TASK_CMD="${SCHEDULE_WHAT} mod sched:${TARGET_NEXT_ID}.scheduled"
+    TASK_CMD="${SCHEDULE_WHAT} modify scheduled:${TARGET_NEXT_ID}.scheduled"
 
     echo
     read -n 1 -ep " ${GREEN_BG}task ${TASK_CMD}${RESET} (Y/n) " confirm
 
     if [[ -z $confirm ]] || [[ $confirm == [Yy] ]]; then
-      task rc.bulk=$(__batch_limit) rc.recurrence.confirmation=no $TASK_CMD
+      task rc.bulk=$BATCH_LIMIT rc.recurrence.confirmation=no $TASK_CMD
     else
       echo -e "\n ${RED_BG}action cancelled, no changes made${RESET}\n"
     fi
+
+  # If prompt starts with '[0-9]+' ...
+  # If prompt starts with '[0-9]+ ' ...
+  #
+  # If prompt is a date, target_next is ignored.
+  # If prompt is an id and target_next is null, error and prompt.
+  # If prompt is an offset and target_next is [0-9]+ then use target_next.scheduled.
+  #   ??? How do I tell an offset from a date?
+
+  # Schedule cand_id > prompt == date          target_next == ''     task cand_id mod sched:$prompt
+  # Schedule cand_id > prompt == date          target_next == [0-9]+ task cand_id mod sched:$prompt
+
+  # Sceduled cand_id > prompt == offset        target_next == ''     task cand_id mod sched:$prompt
+  # Sceduled cand_id > prompt == offset        target_next == [0-9]+ task cand_id mod sched:"$target_next.scheduled$prompt"
+
+  # Schedule cand_id > prompt == [0-9]+        target_next == ''     error and prompt
+  # Schedule cand_id > prompt == [0-9]+        target_next == [0-9]+ validate [0-9]+ ; task cand_id mod sched:$prompt.scheduled
+  # Schedule cand_id > prompt == [0-9]+ date   target_next == ''     validate [0-9]+ ; task cand_id mod sched:$prompt[1..]
+  # Schedule cand_id > prompt == [0-9]+ date   target_next == [0-9]+ validate [0-9]+ ; task cand_id mod sched:$prompt[1..]
+  # Sceduled cand_id > prompt == [0-9]+ offset target_next == ''     validate [0-9]+ ; task cand_id mod sched:$prompt[0].scheduled$prompt[1..]
+  # Sceduled cand_id > prompt == [0-9]+ offset target_next == [0-9]+ validate [0-9]+ ; task cand_id mod sched:$prompt[0].scheduled$prompt[1..]
+
   fi
 
 }
