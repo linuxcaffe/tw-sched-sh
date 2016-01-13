@@ -112,10 +112,11 @@ WHITE_FG=$(tput setaf 7)
 #
 # NOTREALLY is used for debugging and dry-runs.
 
-logit () { echo "${LOGIT_PREFIX}$@" >> $LOGFILE ; }
-runit () { logit "$@" ; $NOTREALLY "$@" 2>> $LOGFILE ; }
-task  () { runit $TASK $TASK_OPTS "$@" ; }
-usage () { echo "$USAGE" ; echo -e "${RED_BG} !!! $@${RESET}" ; exit 1 ; }
+logit () { echo "${LOGIT_PREFIX} $@" >> $LOGFILE     ; } 
+runit () { logit "$@" ; $NOTREALLY "$@" 2>> $LOGFILE ; } 
+task  () { runit $TASK $TASK_OPTS "$@"               ; } 
+usage () { echo "$USAGE" ; error "$@" ; exit 1       ; } 
+error () { echo -e "!!! ${RED_BG}$@${RESET}"         ; } 
 
 __rc_context   () { task _get rc.context ; }
 __context_text () { echo ${CONTEXT:=None} ; }
@@ -148,7 +149,7 @@ __target_ () {
   useprintf=
 
   if [[ "$reqtype" ==  '' ]]; then
-    echo "${RED_BG} ${FUNCNAME} needs to know list or id"
+    error "${FUNCNAME} needs to know list or id"
     exit 1
 
   elif [[ "$reqtype" == 'list' ]]; then
@@ -166,7 +167,7 @@ __target_ () {
     options="${options} limit=1"
 
   else
-    echo "${RED_BG} Unknown request type $reqtype"
+    error "Unknown request type $reqtype"
     exit
 
   fi
@@ -195,7 +196,7 @@ __candidate_ () {
   useprintf=
 
   if [[ "$reqtype" == '' ]]; then
-    echo "${RED_BG} ${FUNCNAME} needs to know list or id"
+    error "${FUNCNAME} needs to know list or id"
     exit 1
 
   elif [[ "$reqtype" == 'list' ]]; then
@@ -211,7 +212,7 @@ __candidate_ () {
     options="${options} rc.report.cand_id.sort=$(task _get rc.report.sch_cand.sort)"
 
   else
-    echo "${RED_BG} Unknown request type $reqtype"
+    error "Unknown request type $reqtype"
     exit
 
   fi
@@ -270,7 +271,7 @@ candidates_list () {
 
   if [[ $BATCH_MODE -eq 0 ]]; then
     if [[ $CANDIDATE_COUNT -eq 0 ]]; then
-      echo -e "${RED_BG} No tasks match! Try changing the context or filter.${RESET}"
+      error "No tasks match! Try changing the context or filter."
       exit 1
 
     else
@@ -345,55 +346,75 @@ run_task_command () {
   PROMPT="$@"
   TARGET_NEXT_ID=$(__target_ id)
 
-  # Schedule cand_id > prompt == ^-            target_next == [0-9]+ error and prompt
-  # Schedule cand_id > prompt == ^-            target_next == ''     error and prompt
-  # Schedule cand_id > prompt == ''            target_next == ''     error and prompt
-  # Schedule cand_id > prompt == ''            target_next == [0-9]+ task cand_id mod sched:$target_next.scheduled
+  local TASK_CMD
+  local ID_REGEX
 
-  if [[ -n $TARGET_NEXT_ID ]] && [[ ! $TARGET_NEXT_ID =~ [0-9]+ ]]; then
-    echo "${RED_BG}!!! Do not know how to handle non-numeric TARGET_NEXT_ID ${TARGET_NEXT_ID} result${RESET}"
-    exit 1
+  TASK_CMD=
+  ID_REGEX='^[0-9]+$'
+
+  # Schedule cand_id > prompt == ^-            target_next == $ID_REGEX error and prompt
+  # Schedule cand_id > prompt == ^-            target_next == ''        error and prompt
+  # Schedule cand_id > prompt == ''            target_next == ''        error and prompt
+  # Schedule cand_id > prompt == ''            target_next == $ID_REGEX task cand_id mod sched:$target_next.scheduled
+  # Schedule cand_id > prompt == $ID_REGEX        target_next == ''        error and prompt
+  # Schedule cand_id > prompt == $ID_REGEX        target_next == $ID_REGEX validate $ID_REGEX ; task cand_id mod sched:$prompt.scheduled
+
+  if [[ -n $TARGET_NEXT_ID ]] && [[ ! $TARGET_NEXT_ID =~ $ID_REGEX ]]; then
+    error "Do not know how to handle non-numeric TARGET_NEXT_ID ${TARGET_NEXT_ID} result."
 
   elif [[ $PROMPT =~ ^- ]]; then
-    echo "${RED_BG}!!! Past dates are invalid.${RESET}"
-    exit 1
+    error "Past dates are invalid."
 
   elif [[ -z $PROMPT ]] && [[ -z $TARGET_NEXT_ID ]]; then
-    echo -e "\n ${RED_BG}No targets found, please enter a date or date offset.${RESET}\n"
+    error "No targets found, please enter a date or date offset."
 
-  elif [[ -z $PROMPT ]] && [[ $TARGET_NEXT_ID =~ [0-9]+ ]]; then
-    TASK_CMD="${SCHEDULE_WHAT} modify scheduled:${TARGET_NEXT_ID}.scheduled"
+  elif [[ -z $PROMPT ]] && [[ $TARGET_NEXT_ID =~ $ID_REGEX ]]; then
+    TASK_CMD="${SCHEDULE_WHAT} modify scheduled=${TARGET_NEXT_ID}.scheduled rc.bulk=${BATCH_LIMIT} rc.recurrence.confirmation=no"
+
+  elif [[ $PROMPT =~ $ID_REGEX ]]; then
+    if [[ -z $TARGET_NEXT_ID ]]; then
+      error "No target specified."
+
+    else
+      error "XXX: validate ${PROMPT} against target list ..."
+      TASK_CMD="${SCHEDULE_WHAT} modify scheduled=${PROMPT}.scheduled"
+
+    fi
+
+  # If prompt starts with '$ID_REGEX ' ...
+  #
+  # If prompt is a date, target_next is ignored.
+  # If prompt is an offset and target_next is $ID_REGEX then use target_next.scheduled.
+  #   ??? How do I tell an offset from a date?
+  #       If it matches [0-9]+[st|nd|rd|th] || [^0-9].* ... damn ... mod scheduled:hr is the same as +1hr ...
+  #       If it starts with a number, and doesn't match [0-9]+[st|nd|rd|th] then it can be interchangeably a date or offset,
+  #       otherwise, it's a date.
+
+  # Schedule cand_id > prompt == date          target_next == ''        task cand_id mod sched:$prompt
+  # Schedule cand_id > prompt == date          target_next == $ID_REGEX task cand_id mod sched:$prompt
+
+  # Sceduled cand_id > prompt == offset        target_next == ''        task cand_id mod sched:$prompt
+  # Sceduled cand_id > prompt == offset        target_next == $ID_REGEX task cand_id mod sched:$target_next.scheduled$prompt
+
+  # Schedule cand_id > prompt == $ID_REGEX date   target_next == ''        validate $ID_REGEX ; task cand_id mod sched:$prompt[1..]
+  # Schedule cand_id > prompt == $ID_REGEX date   target_next == $ID_REGEX validate $ID_REGEX ; task cand_id mod sched:$prompt[1..]
+  # Sceduled cand_id > prompt == $ID_REGEX offset target_next == ''        validate $ID_REGEX ; task cand_id mod sched:$prompt[0].scheduled$prompt[1..]
+  # Sceduled cand_id > prompt == $ID_REGEX offset target_next == $ID_REGEX validate $ID_REGEX ; task cand_id mod sched:$prompt[0].scheduled$prompt[1..]
+
+  fi
+
+  if [[ -n $TASK_CMD ]]; then
 
     echo
     read -n 1 -ep " ${GREEN_BG}task ${TASK_CMD}${RESET} (Y/n) " confirm
 
     if [[ -z $confirm ]] || [[ $confirm == [Yy] ]]; then
       task rc.bulk=$BATCH_LIMIT rc.recurrence.confirmation=no $TASK_CMD
+
     else
-      echo -e "\n ${RED_BG}action cancelled, no changes made${RESET}\n"
+      error "Action cancelled, no changes made."
+
     fi
-
-  # If prompt starts with '[0-9]+' ...
-  # If prompt starts with '[0-9]+ ' ...
-  #
-  # If prompt is a date, target_next is ignored.
-  # If prompt is an id and target_next is null, error and prompt.
-  # If prompt is an offset and target_next is [0-9]+ then use target_next.scheduled.
-  #   ??? How do I tell an offset from a date?
-
-  # Schedule cand_id > prompt == date          target_next == ''     task cand_id mod sched:$prompt
-  # Schedule cand_id > prompt == date          target_next == [0-9]+ task cand_id mod sched:$prompt
-
-  # Sceduled cand_id > prompt == offset        target_next == ''     task cand_id mod sched:$prompt
-  # Sceduled cand_id > prompt == offset        target_next == [0-9]+ task cand_id mod sched:"$target_next.scheduled$prompt"
-
-  # Schedule cand_id > prompt == [0-9]+        target_next == ''     error and prompt
-  # Schedule cand_id > prompt == [0-9]+        target_next == [0-9]+ validate [0-9]+ ; task cand_id mod sched:$prompt.scheduled
-  # Schedule cand_id > prompt == [0-9]+ date   target_next == ''     validate [0-9]+ ; task cand_id mod sched:$prompt[1..]
-  # Schedule cand_id > prompt == [0-9]+ date   target_next == [0-9]+ validate [0-9]+ ; task cand_id mod sched:$prompt[1..]
-  # Sceduled cand_id > prompt == [0-9]+ offset target_next == ''     validate [0-9]+ ; task cand_id mod sched:$prompt[0].scheduled$prompt[1..]
-  # Sceduled cand_id > prompt == [0-9]+ offset target_next == [0-9]+ validate [0-9]+ ; task cand_id mod sched:$prompt[0].scheduled$prompt[1..]
-
   fi
 
 }
