@@ -352,12 +352,12 @@ run_task_command () {
   TASK_CMD=
   ID_REGEX='^[0-9]+$'
 
-  # Schedule cand_id > prompt == ^-            target_next == $ID_REGEX error and prompt
-  # Schedule cand_id > prompt == ^-            target_next == ''        error and prompt
-  # Schedule cand_id > prompt == ''            target_next == ''        error and prompt
-  # Schedule cand_id > prompt == ''            target_next == $ID_REGEX task cand_id mod sched:$target_next.scheduled
-  # Schedule cand_id > prompt == $ID_REGEX        target_next == ''        error and prompt
-  # Schedule cand_id > prompt == $ID_REGEX        target_next == $ID_REGEX validate $ID_REGEX ; task cand_id mod sched:$prompt.scheduled
+  # Schedule cand_id > prompt == ^-        target_next == $ID_REGEX error and prompt
+  # Schedule cand_id > prompt == ^-        target_next == ''        error and prompt
+  # Schedule cand_id > prompt == ''        target_next == ''        error and prompt
+  # Schedule cand_id > prompt == ''        target_next == $ID_REGEX task cand_id mod sched:$target_next.scheduled
+  # Schedule cand_id > prompt == $ID_REGEX target_next == ''        error and prompt
+  # Schedule cand_id > prompt == $ID_REGEX target_next == $ID_REGEX validate $ID_REGEX ; task cand_id mod sched:$prompt.scheduled
 
   if [[ -n $TARGET_NEXT_ID ]] && [[ ! $TARGET_NEXT_ID =~ $ID_REGEX ]]; then
     error "Do not know how to handle non-numeric TARGET_NEXT_ID ${TARGET_NEXT_ID} result."
@@ -392,7 +392,6 @@ run_task_command () {
 
   # Schedule cand_id > prompt == date          target_next == ''        task cand_id mod sched:$prompt
   # Schedule cand_id > prompt == date          target_next == $ID_REGEX task cand_id mod sched:$prompt
-
   # Sceduled cand_id > prompt == offset        target_next == ''        task cand_id mod sched:$prompt
   # Sceduled cand_id > prompt == offset        target_next == $ID_REGEX task cand_id mod sched:$target_next.scheduled$prompt
 
