@@ -350,18 +350,13 @@ run_task_command () {
   local ID_REGEX
 
   TASK_CMD=
-  ID_REGEX='^[0-9]+$'
-
-  # Schedule cand_id > prompt == ^-        target_next == $ID_REGEX error and prompt
-  # Schedule cand_id > prompt == ^-        target_next == ''        error and prompt
-  # Schedule cand_id > prompt == ''        target_next == ''        error and prompt
-  # Schedule cand_id > prompt == ''        target_next == $ID_REGEX task cand_id mod sched:$target_next.scheduled
-  # Schedule cand_id > prompt == $ID_REGEX target_next == ''        error and prompt
-  # Schedule cand_id > prompt == $ID_REGEX target_next == $ID_REGEX validate $ID_REGEX ; task cand_id mod sched:$prompt.scheduled
+  ID_REGEX='[0-9]+'
 
   if [[ -n $TARGET_NEXT_ID ]] && [[ ! $TARGET_NEXT_ID =~ $ID_REGEX ]]; then
     error "Do not know how to handle non-numeric TARGET_NEXT_ID ${TARGET_NEXT_ID} result."
 
+  elif [[ $PROMPT =~ "^$ID_REGEX$" ]]; then
+    
   elif [[ $PROMPT =~ ^- ]]; then
     error "Past dates are invalid."
 
@@ -380,26 +375,6 @@ run_task_command () {
       TASK_CMD="${SCHEDULE_WHAT} modify scheduled=${PROMPT}.scheduled"
 
     fi
-
-  # If prompt starts with '$ID_REGEX ' ...
-  #
-  # If prompt is a date, target_next is ignored.
-  # If prompt is an offset and target_next is $ID_REGEX then use target_next.scheduled.
-  #   ??? How do I tell an offset from a date?
-  #       If it matches [0-9]+[st|nd|rd|th] || [^0-9].* ... damn ... mod scheduled:hr is the same as +1hr ...
-  #       If it starts with a number, and doesn't match [0-9]+[st|nd|rd|th] then it can be interchangeably a date or offset,
-  #       otherwise, it's a date.
-
-  # Schedule cand_id > prompt == date          target_next == ''        task cand_id mod sched:$prompt
-  # Schedule cand_id > prompt == date          target_next == $ID_REGEX task cand_id mod sched:$prompt
-  # Sceduled cand_id > prompt == offset        target_next == ''        task cand_id mod sched:$prompt
-  # Sceduled cand_id > prompt == offset        target_next == $ID_REGEX task cand_id mod sched:$target_next.scheduled$prompt
-
-  # Schedule cand_id > prompt == $ID_REGEX date   target_next == ''        validate $ID_REGEX ; task cand_id mod sched:$prompt[1..]
-  # Schedule cand_id > prompt == $ID_REGEX date   target_next == $ID_REGEX validate $ID_REGEX ; task cand_id mod sched:$prompt[1..]
-  # Sceduled cand_id > prompt == $ID_REGEX offset target_next == ''        validate $ID_REGEX ; task cand_id mod sched:$prompt[0].scheduled$prompt[1..]
-  # Sceduled cand_id > prompt == $ID_REGEX offset target_next == $ID_REGEX validate $ID_REGEX ; task cand_id mod sched:$prompt[0].scheduled$prompt[1..]
-
   fi
 
   if [[ -n $TASK_CMD ]]; then
