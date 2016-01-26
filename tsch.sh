@@ -112,10 +112,11 @@ WHITE_FG=$(tput setaf 7)
 #
 # NOTREALLY is used for debugging and dry-runs.
 
-logit () { echo "${LOGIT_PREFIX}$@" >> $LOGFILE ; }
-runit () { logit "$@" ; $NOTREALLY "$@" 2>> $LOGFILE ; }
-task  () { runit $TASK $TASK_OPTS "$@" ; }
-usage () { echo "$USAGE" ; echo -e "${RED_BG} !!! $@${RESET}" ; exit 1 ; }
+logit () { echo "${LOGIT_PREFIX} $@" >> $LOGFILE     ; } 
+runit () { logit "$@" ; $NOTREALLY "$@" 2>> $LOGFILE ; } 
+task  () { runit $TASK $TASK_OPTS "$@"               ; } 
+usage () { echo "$USAGE" ; error "$@" ; exit 1       ; } 
+error () { echo -e "!!! ${RED_BG}$@${RESET}"         ; } 
 
 __rc_context   () { task _get rc.context ; }
 __context_text () { echo ${CONTEXT:=None} ; }
@@ -148,7 +149,7 @@ __target_ () {
   useprintf=
 
   if [[ "$reqtype" ==  '' ]]; then
-    echo "${RED_BG} ${FUNCNAME} needs to know list or id"
+    error "${FUNCNAME} needs to know list or id"
     exit 1
 
   elif [[ "$reqtype" == 'list' ]]; then
@@ -164,9 +165,10 @@ __target_ () {
     options="${options} rc.report.target_id.sort=$(task _get rc.report.sch_target.sort)"
     options="${options} rc.verbose=nothing"
     options="${options} limit=1"
+    error "XXX: validate ${PROMPT} against target list ... (issue #6)"
 
   else
-    echo "${RED_BG} Unknown request type $reqtype"
+    error "Unknown request type $reqtype"
     exit
 
   fi
@@ -191,11 +193,11 @@ __candidate_ () {
   local options
   local useprintf
 
-  options="${options} $TASK_OPTS"
+  options="${options} $TASK_OPTS tag.not=nosch"
   useprintf=
 
   if [[ "$reqtype" == '' ]]; then
-    echo "${RED_BG} ${FUNCNAME} needs to know list or id"
+    error "${FUNCNAME} needs to know list or id"
     exit 1
 
   elif [[ "$reqtype" == 'list' ]]; then
@@ -211,7 +213,7 @@ __candidate_ () {
     options="${options} rc.report.cand_id.sort=$(task _get rc.report.sch_cand.sort)"
 
   else
-    echo "${RED_BG} Unknown request type $reqtype"
+    error "Unknown request type $reqtype"
     exit
 
   fi
@@ -270,7 +272,7 @@ candidates_list () {
 
   if [[ $BATCH_MODE -eq 0 ]]; then
     if [[ $CANDIDATE_COUNT -eq 0 ]]; then
-      echo -e "${RED_BG} No tasks match! Try changing the context or filter.${RESET}"
+      error "No tasks match! Try changing the context or filter."
       exit 1
 
     else
@@ -345,20 +347,67 @@ run_task_command () {
   PROMPT="$@"
   TARGET_NEXT_ID=$(__target_ id)
 
-  if [[ -z $PROMPT ]] && [[ -z $TARGET_NEXT_ID ]]; then
-    echo -e "\n ${RED_BG}No targets found, please enter a date or date offset.${RESET}\n"
+  local TASK_CMD
+  local ID_REGEX
+  local SCHEDULE
 
-  elif [[ -z $PROMPT ]] && [[ $TARGET_NEXT_ID =~ [0-9]+ ]]; then
-    TASK_CMD="${SCHEDULE_WHAT} mod sched:${TARGET_NEXT_ID}.scheduled"
+  TASK_CMD=
+  SCHEDULE=
+  ID_REGEX='[0-9]+'
 
-    echo
-    read -n 1 -ep " ${GREEN_BG}task ${TASK_CMD}${RESET} (Y/n) " confirm
+  if [[ -n $TARGET_NEXT_ID ]] && [[ ! $TARGET_NEXT_ID =~ ^$ID_REGEX$ ]]; then
+    error "Do not know how to handle non-numeric TARGET_NEXT_ID ${TARGET_NEXT_ID} result."
+    exit
 
-    if [[ -z $confirm ]] || [[ $confirm == [Yy] ]]; then
-      task rc.bulk=$(__batch_limit) rc.recurrence.confirmation=no $TASK_CMD
+  elif [[ -z $PROMPT ]] && [[ -z $TARGET_NEXT_ID ]]; then
+    error "No targets found, please enter a date or date offset."
+    exit
+
+  elif [[ -z $PROMPT ]] && [[ -n $TARGET_NEXT_ID ]]; then
+    SCHEDULE="${TARGET_NEXT_ID}.scheduled"
+
+  elif [[ $PROMPT =~ ^($ID_REGEX)?(.*)$ ]]; then
+    local PROMPT_ID=${BASH_REMATCH[1]}
+    local CALC=${BASH_REMATCH[2]}
+
+    if [[ -z $TARGET_NEXT_ID ]]; then
+      error "No target specified."
+      exit
+
+    elif [[ -n $PROMPT_ID ]] && [[ -z $CALC ]]; then
+      SCHEDULE="${PROMPT_ID}.scheduled"
+
+    elif [[ -z $PROMPT_ID ]] && [[ -n $CALC ]]; then
+      SCHEDULE="$CALC"
+
+    elif [[ -n $PROMPT_ID ]] && [[ -n $CALC ]]; then
+      SCHEDULE="${PROMPT_ID}.scheduled${CALC}"
+
     else
-      echo -e "\n ${RED_BG}action cancelled, no changes made${RESET}\n"
+      error "If you got here the programmer is an idiot."
+      exit
+
     fi
+  else
+    error "XXX: Unexpected condition not checked (PROMPT: ${PROMPT} TARGET_NEXT_ID: ${TARGET_NEXT_ID}"
+    exit
+
+  fi
+
+  local CHECK_SCHEDULE=
+  CHECK_SCHEDULE=$(task calc $SCHEDULE)
+
+  TASK_CMD="${SCHEDULE_WHAT} modify scheduled=${SCHEDULE} rc.bulk=${BATCH_LIMIT} rc.recurrence.confirmation=no"
+
+  echo
+  read -n 1 -ep " ${GREEN_BG}task ${TASK_CMD}${RESET} (Y/n) " confirm
+
+  if [[ -z $confirm ]] || [[ $confirm == [Yy] ]]; then
+    task rc.bulk=$BATCH_LIMIT rc.recurrence.confirmation=no $TASK_CMD
+
+  else
+    error "Action cancelled, no changes made."
+
   fi
 
 }
