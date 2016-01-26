@@ -401,7 +401,12 @@ run_task_command () {
 
   fi
 
-  CHECK_SCHEDULE=$(task calc $SCHEDULE)
+  CHECK_SCHEDULE=$(task calc $PROMPT_CALC)
+
+  if [[ "$CHECK_SCHEDULE" == "$PROMPT_CALC" ]]; then
+    error "Invalid date entry ($PROMPT_CALC)"
+    exit
+  fi
 
   TASK_CMD="${SCHEDULE_WHAT} modify scheduled=${SCHEDULE} rc.bulk=${BATCH_LIMIT} rc.recurrence.confirmation=no"
 
