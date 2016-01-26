@@ -112,11 +112,11 @@ WHITE_FG=$(tput setaf 7)
 #
 # NOTREALLY is used for debugging and dry-runs.
 
-logit () { echo "${LOGIT_PREFIX} $@" >> $LOGFILE     ; } 
-runit () { logit "$@" ; $NOTREALLY "$@" 2>> $LOGFILE ; } 
-task  () { runit $TASK $TASK_OPTS "$@"               ; } 
-usage () { echo "$USAGE" ; error "$@" ; exit 1       ; } 
-error () { echo -e "!!! ${RED_BG}$@${RESET}"         ; } 
+logit () { echo "${LOGIT_PREFIX} $@" >> $LOGFILE     ; }
+runit () { logit "$@" ; $NOTREALLY "$@" 2>> $LOGFILE ; }
+task  () { runit $TASK $TASK_OPTS "$@"               ; }
+usage () { echo "$USAGE" ; error "$@" ; exit 1       ; }
+error () { echo -e "!!! ${RED_BG}$@${RESET}"         ; }
 
 __rc_context   () { task _get rc.context ; }
 __context_text () { echo ${CONTEXT:=None} ; }
@@ -141,12 +141,15 @@ __target_ () {
   reqtype=$1
   shift
 
-  local task_command
   local options
-  local useprintf
+  local output
+  local stripspaces
+  local task_command
+  local usequotes
 
   options="${options} $TASK_OPTS"
-  useprintf=
+  usequotes=
+  stripspaces=
 
   if [[ "$reqtype" ==  '' ]]; then
     error "${FUNCNAME} needs to know list or id"
@@ -154,18 +157,19 @@ __target_ () {
 
   elif [[ "$reqtype" == 'list' ]]; then
     task_command='sch_target'
-    useprintf='yes'
+    usequotes='yes'
     options="${options} rc.verbose=label"
     options="${options} limit=$(__target_list_limit)"
 
   elif [[ "$reqtype" == 'id' ]]; then
     task_command='target_id'
-    options="${options} rc.report.target_id.columns=id"
-    options="${options} rc.report.target_id.filter=$(task _get rc.report.sch_target.filter)"
-    options="${options} rc.report.target_id.sort=$(task _get rc.report.sch_target.sort)"
+    stripspaces='yes'
+    options="${options} rc.report.${task_command}.columns=id"
+    options="${options} rc.report.${task_command}.filter=$(task _get rc.report.sch_target.filter)"
+    options="${options} rc.report.${task_command}.sort=$(task _get rc.report.sch_target.sort)"
     options="${options} rc.verbose=nothing"
     options="${options} limit=1"
-    error "XXX: validate ${PROMPT} against target list ... (issue #6)"
+    #error "XXX: validate ${PROMPT} against target list ... (issue #6)"
 
   else
     error "Unknown request type $reqtype"
@@ -176,11 +180,14 @@ __target_ () {
   [[ -n $CONTEXT ]] && options="${options} rc.context=$CONTEXT"
   [[ -n $FILTER ]]  && options="${options} $FILTER"
 
-  if [[ -n $useprintf ]]; then
-    printf '%s' $(task $options $task_command)
-  else
-    task $options $task_command
+  output="$(task $options $task_command)"
+
+  if [[ -n $stripspaces ]]; then
+    output=${output# *}
+    output=${output%% *}
   fi
+
+  echo "$output"
 
 }
 
@@ -347,16 +354,20 @@ run_task_command () {
   PROMPT="$@"
   TARGET_NEXT_ID=$(__target_ id)
 
-  local TASK_CMD
-  local ID_REGEX
-  local SCHEDULE
+  local CHECK_SCHEDULE=
+  local ID_REGEX='[0-9]+'
+  local PROMPT_CALC=
+  local PROMPT_ID=
+  local SCHEDULE=
+  local TASK_CMD=
 
-  TASK_CMD=
-  SCHEDULE=
-  ID_REGEX='[0-9]+'
+  # non-empty target_next_id && target_next_id is nan.
+  # empty prompt && empty target_next_id
+  # empty prompt && target_next_id is id
+  # prompt is not empty
 
   if [[ -n $TARGET_NEXT_ID ]] && [[ ! $TARGET_NEXT_ID =~ ^$ID_REGEX$ ]]; then
-    error "Do not know how to handle non-numeric TARGET_NEXT_ID ${TARGET_NEXT_ID} result."
+    error "Do not know how to handle non-numeric TARGET_NEXT_ID (${TARGET_NEXT_ID}) result."
     exit
 
   elif [[ -z $PROMPT ]] && [[ -z $TARGET_NEXT_ID ]]; then
@@ -367,21 +378,17 @@ run_task_command () {
     SCHEDULE="${TARGET_NEXT_ID}.scheduled"
 
   elif [[ $PROMPT =~ ^($ID_REGEX)?(.*)$ ]]; then
-    local PROMPT_ID=${BASH_REMATCH[1]}
-    local CALC=${BASH_REMATCH[2]}
+    PROMPT_ID=${BASH_REMATCH[1]}
+    PROMPT_CALC=${BASH_REMATCH[2]}
 
-    if [[ -z $TARGET_NEXT_ID ]]; then
-      error "No target specified."
-      exit
-
-    elif [[ -n $PROMPT_ID ]] && [[ -z $CALC ]]; then
+    if [[ -n $PROMPT_ID ]] && [[ -z $PROMPT_CALC ]]; then
       SCHEDULE="${PROMPT_ID}.scheduled"
 
-    elif [[ -z $PROMPT_ID ]] && [[ -n $CALC ]]; then
-      SCHEDULE="$CALC"
+    elif [[ -z $PROMPT_ID ]] && [[ -n $PROMPT_CALC ]]; then
+      SCHEDULE="$PROMPT_CALC"
 
-    elif [[ -n $PROMPT_ID ]] && [[ -n $CALC ]]; then
-      SCHEDULE="${PROMPT_ID}.scheduled${CALC}"
+    elif [[ -n $PROMPT_ID ]] && [[ -n $PROMPT_CALC ]]; then
+      SCHEDULE="${PROMPT_ID}.scheduled${PROMPT_CALC}"
 
     else
       error "If you got here the programmer is an idiot."
@@ -394,7 +401,6 @@ run_task_command () {
 
   fi
 
-  local CHECK_SCHEDULE=
   CHECK_SCHEDULE=$(task calc $SCHEDULE)
 
   TASK_CMD="${SCHEDULE_WHAT} modify scheduled=${SCHEDULE} rc.bulk=${BATCH_LIMIT} rc.recurrence.confirmation=no"
