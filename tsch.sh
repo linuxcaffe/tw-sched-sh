@@ -372,7 +372,7 @@ run_task_command () {
 
   elif [[ -z $PROMPT ]] && [[ -z $TARGET_NEXT_ID ]]; then
     error "No targets found, please enter a date or date offset."
-    exit
+    return
 
   elif [[ -z $PROMPT ]] && [[ -n $TARGET_NEXT_ID ]]; then
     SCHEDULE="${TARGET_NEXT_ID}.scheduled"
@@ -392,12 +392,12 @@ run_task_command () {
 
     else
       error "If you got here the programmer is an idiot."
-      exit
+      return
 
     fi
   else
     error "XXX: Unexpected condition not checked (PROMPT: ${PROMPT} TARGET_NEXT_ID: ${TARGET_NEXT_ID}"
-    exit
+    return
 
   fi
 
@@ -405,22 +405,22 @@ run_task_command () {
 
   if [[ "$CHECK_SCHEDULE" == "$PROMPT_CALC" ]]; then
     error "Invalid date entry ($PROMPT_CALC)"
-    exit
-  fi
-
-  TASK_CMD="${SCHEDULE_WHAT} modify scheduled=${SCHEDULE} rc.bulk=${BATCH_LIMIT} rc.recurrence.confirmation=no"
-
-  echo
-  read -n 1 -ep " ${GREEN_BG}task ${TASK_CMD}${RESET} (Y/n) " confirm
-
-  if [[ -z $confirm ]] || [[ $confirm == [Yy] ]]; then
-    task rc.bulk=$BATCH_LIMIT rc.recurrence.confirmation=no $TASK_CMD
 
   else
-    error "Action cancelled, no changes made."
+    local TASK_CMD="${SCHEDULE_WHAT} modify scheduled=${SCHEDULE}"
+    local TASK_CMD_EXTRA="rc.bulk=${BATCH_LIMIT} rc.recurrence.confirmation=no"
 
+    echo
+    read -n 1 -ep " ${GREEN_BG}task ${TASK_CMD}${RESET} (Y/n) " confirm
+
+    if [[ -z $confirm ]] || [[ $confirm == [Yy] ]]; then
+      task $TASK_CMD_EXTRA $TASK_CMD
+
+    else
+      error "Action cancelled, no changes made."
+
+    fi
   fi
-
 }
 
 ##################################################################################
