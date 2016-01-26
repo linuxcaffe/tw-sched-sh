@@ -165,6 +165,7 @@ __target_ () {
     options="${options} rc.report.target_id.sort=$(task _get rc.report.sch_target.sort)"
     options="${options} rc.verbose=nothing"
     options="${options} limit=1"
+    error "XXX: validate ${PROMPT} against target list ... (issue #6)"
 
   else
     error "Unknown request type $reqtype"
@@ -348,47 +349,65 @@ run_task_command () {
 
   local TASK_CMD
   local ID_REGEX
+  local SCHEDULE
 
   TASK_CMD=
+  SCHEDULE=
   ID_REGEX='[0-9]+'
 
-  if [[ -n $TARGET_NEXT_ID ]] && [[ ! $TARGET_NEXT_ID =~ $ID_REGEX ]]; then
+  if [[ -n $TARGET_NEXT_ID ]] && [[ ! $TARGET_NEXT_ID =~ ^$ID_REGEX$ ]]; then
     error "Do not know how to handle non-numeric TARGET_NEXT_ID ${TARGET_NEXT_ID} result."
-
-  elif [[ $PROMPT =~ "^$ID_REGEX$" ]]; then
-    
-  elif [[ $PROMPT =~ ^- ]]; then
-    error "Past dates are invalid."
+    exit
 
   elif [[ -z $PROMPT ]] && [[ -z $TARGET_NEXT_ID ]]; then
     error "No targets found, please enter a date or date offset."
+    exit
 
-  elif [[ -z $PROMPT ]] && [[ $TARGET_NEXT_ID =~ $ID_REGEX ]]; then
-    TASK_CMD="${SCHEDULE_WHAT} modify scheduled=${TARGET_NEXT_ID}.scheduled rc.bulk=${BATCH_LIMIT} rc.recurrence.confirmation=no"
+  elif [[ -z $PROMPT ]] && [[ -n $TARGET_NEXT_ID ]]; then
+    SCHEDULE="${TARGET_NEXT_ID}.scheduled"
 
-  elif [[ $PROMPT =~ $ID_REGEX ]]; then
+  elif [[ $PROMPT =~ ^($ID_REGEX)?(.*)$ ]]; then
+    local PROMPT_ID=${BASH_REMATCH[1]}
+    local CALC=${BASH_REMATCH[2]}
+
     if [[ -z $TARGET_NEXT_ID ]]; then
       error "No target specified."
+      exit
+
+    elif [[ -n $PROMPT_ID ]] && [[ -z $CALC ]]; then
+      SCHEDULE="${PROMPT_ID}.scheduled"
+
+    elif [[ -z $PROMPT_ID ]] && [[ -n $CALC ]]; then
+      SCHEDULE="$CALC"
+
+    elif [[ -n $PROMPT_ID ]] && [[ -n $CALC ]]; then
+      SCHEDULE="${PROMPT_ID}.scheduled${CALC}"
 
     else
-      error "XXX: validate ${PROMPT} against target list ..."
-      TASK_CMD="${SCHEDULE_WHAT} modify scheduled=${PROMPT}.scheduled"
+      error "If you got here the programmer is an idiot."
+      exit
 
     fi
+  else
+    error "XXX: Unexpected condition not checked (PROMPT: ${PROMPT} TARGET_NEXT_ID: ${TARGET_NEXT_ID}"
+    exit
+
   fi
 
-  if [[ -n $TASK_CMD ]]; then
+  local CHECK_SCHEDULE=
+  CHECK_SCHEDULE=$(task calc $SCHEDULE)
 
-    echo
-    read -n 1 -ep " ${GREEN_BG}task ${TASK_CMD}${RESET} (Y/n) " confirm
+  TASK_CMD="${SCHEDULE_WHAT} modify scheduled=${SCHEDULE} rc.bulk=${BATCH_LIMIT} rc.recurrence.confirmation=no"
 
-    if [[ -z $confirm ]] || [[ $confirm == [Yy] ]]; then
-      task rc.bulk=$BATCH_LIMIT rc.recurrence.confirmation=no $TASK_CMD
+  echo
+  read -n 1 -ep " ${GREEN_BG}task ${TASK_CMD}${RESET} (Y/n) " confirm
 
-    else
-      error "Action cancelled, no changes made."
+  if [[ -z $confirm ]] || [[ $confirm == [Yy] ]]; then
+    task rc.bulk=$BATCH_LIMIT rc.recurrence.confirmation=no $TASK_CMD
 
-    fi
+  else
+    error "Action cancelled, no changes made."
+
   fi
 
 }
