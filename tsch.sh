@@ -89,6 +89,7 @@ at the Schedule > prompt;
 # ideas. There are other frameworks kicking around the web.
 
 
+CLEAR=$(tput clear)
 BOLD=$(tput bold)
 RESET=$(tput sgr0)
 
@@ -253,7 +254,7 @@ __header_text () {
 
   HEADER_TEXT='<----- Taskwarrior'
   [[ $BATCH_MODE -eq 1 ]] &&  HEADER_TEXT="${HEADER_TEXT} Batch"
-  HEADER_TEXT="${HEADER_TEXT} $(__schedule_text) ----->"
+  HEADER_TEXT="${CLEAR}${HEADER_TEXT} $(__schedule_text) ----->"
 
   echo $HEADER_TEXT
 
@@ -352,7 +353,6 @@ hint_text () { echo -e "$DIVIDER
 run_task_command () {
 
   PROMPT="$@"
-  TARGET_NEXT_ID=$(__target_ id)
 
   local CHECK_SCHEDULE=
   local ID_REGEX='[0-9]+'
@@ -402,9 +402,11 @@ run_task_command () {
   fi
 
   CHECK_SCHEDULE=$(task calc $PROMPT_CALC)
+  RETURN=0
 
-  if [[ "$CHECK_SCHEDULE" == "$PROMPT_CALC" ]]; then
+  if [[ -n $PROMPT_CALC ]] && [[ "$CHECK_SCHEDULE" == "$PROMPT_CALC" ]]; then
     error "Invalid date entry ($PROMPT_CALC)"
+    RETURN=1
 
   else
     local TASK_CMD="${SCHEDULE_WHAT} modify scheduled=${SCHEDULE}"
@@ -418,9 +420,13 @@ run_task_command () {
 
     else
       error "Action cancelled, no changes made."
+      RETURN=1
 
     fi
   fi
+
+  return $RETURN
+
 }
 
 ##################################################################################
@@ -482,21 +488,38 @@ FILTER="$@"
 ##################################################################################
 # main
 
-header_text
-candidates_list
-targets_list
-hint_text
+while true; do
 
-SCHEDULE_WHAT=$(__candidate_ id)
+  header_text
+  candidates_list
+  targets_list
+  hint_text
 
-while read -ep " ${BOLD}${GREEN_FG}Schedule ${SCHEDULE_WHAT} >${RESET} " prompt; do
-  history -s "$prompt"
+  SCHEDULE_WHAT=$(__candidate_ id)
+  TARGET_NEXT_ID=$(__target_ id)
 
-  case "$prompt" in
-    h|help) echo "$USAGE"                ;;
-    q|quit) echo -e "Exiting\n" ; exit 0 ;;
-    *) run_task_command $prompt          ;;
-  esac
+  TARGET_TEXT=
+  if [[ -n $TARGET_NEXT_ID ]]; then
+    TARGET_TEXT=" (Target ${TARGET_NEXT_ID})"
+  fi
+
+  PROMPT_TEXT=" ${BOLD}${GREEN_FG}Schedule ${SCHEDULE_WHAT}${TARGET_TEXT} >${RESET} "
+
+  while read -ep "$PROMPT_TEXT" prompt; do
+    history -s "$prompt"
+
+    case "$prompt" in
+      h|help) echo "$USAGE"                ;;
+      q|quit) echo -e "Exiting\n" ; exit 0 ;;
+      *) run_task_command $prompt          ;;
+    esac
+
+    if [[ $? == 0 ]]; then
+      read -n 1 -ep " ${GREEN_BG}Command completed, press enter to continue " cont
+      break
+    fi
+
+  done
 done
 
 ##################################################################################
