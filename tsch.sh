@@ -118,6 +118,7 @@ runit () { logit "$@" ; $NOTREALLY "$@" 2>> $LOGFILE ; }
 task  () { runit $TASK $TASK_OPTS "$@"               ; }
 usage () { echo "$USAGE" ; error "$@" ; exit 1       ; }
 error () { echo -e "!!! ${RED_BG}$@${RESET}"         ; }
+msg   () { echo -e "... ${GREEN_FG}$@${RESET}"       ; }
 
 __rc_context   () { task _get rc.context ; }
 __context_text () { echo ${CONTEXT:=None} ; }
@@ -375,7 +376,10 @@ run_task_command () {
     return
 
   elif [[ -z $PROMPT ]] && [[ -n $TARGET_NEXT_ID ]]; then
-    SCHEDULE="${TARGET_NEXT_ID}.scheduled"
+    #SCHEDULE="${TARGET_NEXT_ID}.scheduled"
+    FILTER="${FILTER} id.not=${SCHEDULE_WHAT}"
+    msg "Added ${SCHEDULE_WHAT} to skip list"
+    return
 
   elif [[ $PROMPT =~ ^($ID_REGEX)?(.*)$ ]]; then
     PROMPT_ID=${BASH_REMATCH[1]}
