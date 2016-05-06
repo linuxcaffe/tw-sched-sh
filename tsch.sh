@@ -120,9 +120,35 @@ usage () { echo "$USAGE" ; error "$@" ; exit 1       ; }
 error () { echo -e "!!! ${RED_BG}$@${RESET}"         ; }
 msg   () { echo -e "... ${GREEN_FG}$@${RESET}"       ; }
 
-__rc_context   () { task _get rc.context ; }
-__context_text () { echo ${CONTEXT:=None} ; }
-__filter_text  () { echo ${FILTER:=None}  ; }
+# __join <DELIMITER> "${ARRAY[@]}"
+__join () { local delim=$1 ; shift ; echo -n "$1" ; shift ; printf "%s" "${@/#/$delim}" ; }
+
+# if __is_array_empty "${ARRAY[@]}"; then do stuff for empty array; fi
+__is_array_empty () { if [ "${#@}" -ne 0 ] ; then return 1 ; else return 0 ; fi ; }
+
+__rc_context     () { task _get rc.context          ; }
+__context_text   () { echo ${CONTEXT:=None}         ; }
+__filter_text    () { echo ${FILTER:=None}          ; }
+
+__skip_list_text () {
+
+  if __is_array_empty "${SKIP_LIST[@]}"; then
+    echo 'None'
+  else
+    __join ' ' "${SKIP_LIST[@]}"
+  fi
+
+}
+
+__skip_list () {
+
+  if ! __is_array_empty "${SKIP_LIST[@]}"; then
+    echo "id.not=$(__join ' id.not=' "${SKIP_LIST[@]}")"
+  fi
+
+}
+
+__filter    () { echo "${FILTER} $(__skip_list)" ; }
 
 __batch_limit          () { task _get rc.verbose=nothing rc.sched.batch.limit       ; }
 __candidate_list_limit () { task _get rc.verbose=nothing rc.sched.cand.list.limit   ; }
@@ -133,10 +159,10 @@ __target_list_limit    () { task _get rc.verbose=nothing rc.sched.target.list.li
 # XXX: Are ready and pending counts supposed to have no context?
 # XXX: Shouldn't candidate and target counts use the same context and filter?
 
-__candidate_count     () { task rc.verbose=nothing tag.not:nosch rc.context:$CONTEXT +READY $FILTER count ; }
+__candidate_count     () { task rc.verbose=nothing tag.not:nosch rc.context:$CONTEXT +READY $(__filter) count ; }
 __pending_count       () { task rc.verbose=nothing rc.context: +PENDING count                             ; }
 __ready_count         () { task rc.verbose=nothing rc.context: +PENDING +READY count                      ; }
-__target_count        () { task rc.verbose=nothing +PENDING $FILTER scheduled.after:now count             ; }
+__target_count        () { task rc.verbose=nothing +PENDING $(__filter) scheduled.after:now count             ; }
 
 __target_ () {
 
@@ -180,7 +206,7 @@ __target_ () {
   fi
 
   [[ -n $CONTEXT ]] && options="${options} rc.context=$CONTEXT"
-  [[ -n $FILTER ]]  && options="${options} $FILTER"
+  [[ -n $(__filter) ]]  && options="${options} $(__filter)"
 
   output="$(task $options $task_command)"
 
@@ -228,9 +254,10 @@ __candidate_ () {
   fi
 
   options="${options} limit=1"
+  candidate_filter=$(__filter)
 
   [[ -n $CONTEXT ]] && options="${options} rc.context=$CONTEXT"
-  [[ -n $FILTER ]]  && options="${options} $FILTER"
+  [[ -n $candidate_filter ]]  && options="${options} ${candidate_filter}"
 
   if [[ -n $useprintf ]]; then
     printf "%s" $(task $options $task_command)
@@ -269,8 +296,9 @@ header_text () {
 ${BOLD}${GREEN_FG} $(__header_text) ${RESET}
   ${BOLD}${BLACK_FG}$(__ready_count) ready of $(__pending_count) pending tasks${RESET}
 $DIVIDER
- Context: $(__context_text)
- Filter : $(__filter_text)
+ Context  : $(__context_text)
+ Filter   : $(__filter_text)
+ Skip List: $(__skip_list_text)
 $DIVIDER"
 
 }
@@ -296,7 +324,7 @@ $(__candidate_ list)"
     CANDIDATE_LIST_LIMIT=$(__candidate_list_limit)
 
     echo -e "${BOLD}${GREEN_FG} ${CANDIDATE_COUNT} Candidates${RESET}\n"
-    task rc.verbose=label rc.context:$CONTEXT $FILTER limit:$CANDIDATE_LIST_LIMIT sch_cand;
+    task rc.verbose=label rc.context:$CONTEXT $(__filter) limit:$CANDIDATE_LIST_LIMIT sch_cand;
     echo
 
     if [[ $CANDIDATE_COUNT -gt $BATCH_LIMIT ]]; then
@@ -376,8 +404,7 @@ run_task_command () {
     return
 
   elif [[ -z $PROMPT ]] && [[ -n $TARGET_NEXT_ID ]]; then
-    #SCHEDULE="${TARGET_NEXT_ID}.scheduled"
-    FILTER="${FILTER} id.not=${SCHEDULE_WHAT}"
+    SKIP_LIST+=(${SCHEDULE_WHAT})
     msg "Added ${SCHEDULE_WHAT} to skip list"
     return
 
@@ -476,6 +503,7 @@ elif [[ -z $($TASK _context | grep "^$CONTEXT$") ]]; then
 fi
 
 FILTER="$@"
+SKIP_LIST=()
 
 #cat <<EOT
 #        DBG: ${DBG}
