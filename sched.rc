@@ -13,8 +13,8 @@ sched.datefmt='a D b Y H:N' # date format for target list
 sched.rc.included=yes       # used to test that this file is included
 
 report.sch_cand.description=Scheduling candidates, most urgent first
-report.sch_cand.columns=id,project,tags,description.count,urgency
-report.sch_cand.labels=ID,Project,Tags,Description,Urgency
+report.sch_cand.columns=id,due,description.count,project,tags,urgency
+report.sch_cand.labels=ID,Gue,Description,Project,Tags,Urgency
 report.sch_cand.filter=+PENDING +READY
 report.sch_cand.sort=urgency-,description+
 
