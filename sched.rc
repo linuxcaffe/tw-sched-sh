@@ -14,7 +14,7 @@ sched.rc.included=yes       # used to test that this file is included
 
 report.sch_cand.description=Scheduling candidates, most urgent first
 report.sch_cand.columns=id,due,description.count,project,tags,urgency
-report.sch_cand.labels=ID,Gue,Description,Project,Tags,Urgency
+report.sch_cand.labels=ID,Due,Description,Project,Tags,Urgency
 report.sch_cand.filter=+PENDING +READY
 report.sch_cand.sort=urgency-,description+
 
