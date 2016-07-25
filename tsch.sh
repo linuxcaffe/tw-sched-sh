@@ -53,13 +53,14 @@ USAGE="
 USAGE
 
 ${0##*/} [-d] [-h] [-b] [-l <limit>] [-r] [-u] [-c context] [task filters]
+(* = not tet implemented)
 
     -h          this usage text
     -d          debug mode
-    -b          batch-mode
+    -b          * batch-mode
     -l limit    override default limite for batch-mode
-    -r          re-schedule-mode, acts on sched:stale and +sch tags
-    -u          un-schedule-mode, clear or reset currently scheduled tasks
+    -r          * re-schedule-mode, acts on sched:stale and +sch tags
+    -u          * un-schedule-mode, clear or reset currently scheduled tasks
     -c context  use specified context (default is none)
     filters     any trailing arguments are passed as task filters
 
