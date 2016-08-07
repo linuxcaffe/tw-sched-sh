@@ -536,7 +536,7 @@ while true; do
     TARGET_TEXT=" (Target ${TARGET_NEXT_ID})"
   fi
 
-  PROMPT_TEXT=" ${BOLD}${GREEN_FG}Schedule ${SCHEDULE_WHAT}${TARGET_TEXT} >${RESET} "
+  PROMPT_TEXT=" ${BOLD}${GREEN_FG}Schedule ${SCHEDULE_WHAT} >${RESET} "
 
   while read -ep "$PROMPT_TEXT" prompt; do
     history -s "$prompt"
