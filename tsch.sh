@@ -548,7 +548,7 @@ while true; do
     esac
 
     if [[ $? == 0 ]]; then
-      read -n 1 -ep " ${GREEN_BG}Command completed, press enter to continue " cont
+      read -n 1 -ep " Command completed, press enter to continue " cont
       break
     fi
 
