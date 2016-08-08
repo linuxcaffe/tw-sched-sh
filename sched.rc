@@ -7,6 +7,7 @@ sched.batch.limit=12        # default max for batch-processing
 sched.cand.list.limit=6     # max candidates to list
 sched.target.list.limit=6   # max targets to list
 sched.datefmt='a D b Y H:N' # date format for target list
+sched.hints=on              # on, yes or 1 to display hints
 
 ## don't edit willy-nilly below this line, you might break something!
 ##===================================================================
