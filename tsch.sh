@@ -67,7 +67,7 @@ ${0##*/} [-d] [-h] [-b] [-l <limit>] [-r] [-u] [-c context] [task filters]
     re-schedule-mode and un-schedule-mode are mutually exclusive
 
 at the Schedule > prompt;
-    ID [+|- offset] eg; 142, 217 + 15min, 67 - 2hr, 123 + 2dy, etc
+    target ID [+|- offset] eg; 142, 217 + 15min, 67 - 2hr, 123 + 2dy, etc
     date            including forms like: mon, eow, 11th, Jul10, etc
     h[elp]          show this usage text
     q[uit]          exit without changes
@@ -373,7 +373,7 @@ $(__target_ list)
 
 hint_text () { echo -e "$DIVIDER
 
-   ${BOLD}${BLACK_FG}ID   [+|- offset]  eg: 142, 123 - 2dy, 234 + 2hr, 113 - 1wk
+   ${BOLD}${BLACK_FG}target ID   [+|- offset]  eg: 142, 123 - 2dy, 234 + 2hr, 113 - 1wk
    date [+|- offset]  eg: mon, 15th, eom - 2dy, tomorrow + 14hr
    h[elp]    display USAGE text
    q[uit]    quit without changes${RESET}
@@ -399,10 +399,6 @@ run_task_command () {
   if [[ -n $TARGET_NEXT_ID ]] && [[ ! $TARGET_NEXT_ID =~ ^$ID_REGEX$ ]]; then
     error "Do not know how to handle non-numeric TARGET_NEXT_ID (${TARGET_NEXT_ID}) result."
     exit
-
-  elif [[ -z $PROMPT ]] && [[ -z $TARGET_NEXT_ID ]]; then
-    error "No targets found, please enter a date or date offset."
-    return
 
   elif [[ -z $PROMPT ]] && [[ -n $TARGET_NEXT_ID ]]; then
     SKIP_LIST+=(${SCHEDULE_WHAT})
