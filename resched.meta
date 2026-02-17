@@ -1,0 +1,17 @@
+# resched.meta
+# Review and update stale-dated tasks
+
+name=resched
+version=1.0.0
+type=script
+description=Review and update stale-dated tasks
+repo=https://github.com/linuxcaffe/tw-sched-sh
+base_url=https://raw.githubusercontent.com/linuxcaffe/tw-sched-sh/master
+files=tsch.sh:script,sched.rc:config,README.md:doc
+tags=sched, review, script
+
+checksums=c1e8b4508b55080e5a126e4c714ede96d4b7ab01cb7bc637618b34ef1eeecc8c,bb66794f9f86e8a9d9e8cbd1c4bfd6d8e30862cf9642963b5739d1f530cc3531,71425f8b5ea6712454cb979c2b9ac32abee9632d8db9e9bf4dcf57a58d4f07c7
+
+author=linuxcaffe
+license=MIT
+requires_taskwarrior=2.6.0
