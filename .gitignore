@@ -1,2 +1,9 @@
 notex.txt
 
+
+# Added by make-awesome.py --gitignore
+logs/
+dev/
+claude/
+*.orig
+__pycache__/
