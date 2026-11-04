@@ -84,27 +84,24 @@ install() {
         tw_msg "Kept your sched.rc; the new default is sched.rc.new"
     fi
 
-    # Add config include to included.rc (if present) or .taskrc
     INCLUDED_RC="${TASK_DIR}/config/included.rc"
+    # sched.rc is included: taskwarrior reads it
     if [ "$TASK_DIR" = "$HOME/.task" ]; then
         INC_PATH="~/.task/config/sched.rc"
     else
         INC_PATH="${TASK_DIR}/config/sched.rc"
     fi
-    if grep -qE "^[[:space:]]*include[[:space:]].*sched.rc" "$TASKRC" "$INCLUDED_RC" 2>/dev/null; then
-        tw_msg "Config already included"
-        debug_msg "Config already present: sched.rc" 2
-    elif grep -qE "^[[:space:]]*#[[:space:]]*include[[:space:]].*sched.rc" "$INCLUDED_RC" 2>/dev/null; then
-        sed -i.bak -E "s|^[[:space:]]*#[[:space:]]*(include[[:space:]].*sched.rc)[[:space:]]*(#.*)?$|\1|" "$INCLUDED_RC"
-        tw_msg "Re-enabled config include in included.rc"
+    if grep -qE "^[[:space:]]*include[[:space:]].*/sched\.rc([[:space:]]|$)" "$TASKRC" "$INCLUDED_RC" 2>/dev/null; then
+        tw_msg "Config already included: sched.rc"
+    elif grep -qE "^[[:space:]]*#[[:space:]]*include[[:space:]].*/sched\.rc([[:space:]]|$)" "$INCLUDED_RC" 2>/dev/null; then
+        sed -i.bak -E "s|^[[:space:]]*#[[:space:]]*(include[[:space:]].*/sched\.rc)([[:space:]].*)?$|\1|" "$INCLUDED_RC"
+        tw_msg "Re-enabled config include in included.rc: sched.rc"
     elif [ -f "$INCLUDED_RC" ]; then
         echo "include $INC_PATH" >> "$INCLUDED_RC"
-        tw_msg "Added config include to included.rc"
-        debug_msg "Added to included.rc: include $INC_PATH" 2
+        tw_msg "Added config include to included.rc: sched.rc"
     else
         echo "include $INC_PATH" >> "$TASKRC"
-        tw_msg "Added config include to .taskrc"
-        debug_msg "Added to .taskrc: include $INC_PATH" 2
+        tw_msg "Added config include to .taskrc: sched.rc"
     fi
 
     tw_msg "Downloading documentation..."
@@ -160,17 +157,14 @@ remove() {
     sed -i.bak "/^$APPNAME|/d" "$MANIFEST_FILE"
     debug_msg "Removed from manifest" 2
 
-    # Remove config include from included.rc or .taskrc
+    # Remove config includes from included.rc and .taskrc
     INCLUDED_RC="${TASK_DIR}/config/included.rc"
-    if grep -q "sched.rc" "$INCLUDED_RC" 2>/dev/null; then
-        sed -i.bak "/sched.rc/d" "$INCLUDED_RC"
-        tw_msg "Removed config from included.rc"
-        debug_msg "Removed from included.rc: sched.rc" 2
-    elif grep -q "sched.rc" "$TASKRC" 2>/dev/null; then
-        sed -i.bak "/sched.rc/d" "$TASKRC"
-        tw_msg "Removed config from .taskrc"
-        debug_msg "Removed from .taskrc: sched.rc" 2
-    fi
+    for rcfile in "$INCLUDED_RC" "$TASKRC"; do
+        if grep -qE "^[[:space:]]*#?[[:space:]]*include[[:space:]].*/sched\.rc([[:space:]]|$)" "$rcfile" 2>/dev/null; then
+            sed -i.bak -E "\%^[[:space:]]*#?[[:space:]]*include[[:space:]].*/sched\.rc([[:space:]]|$)%d" "$rcfile"
+            tw_msg "Removed include of sched.rc from $(basename "$rcfile")"
+        fi
+    done
 
     tw_success "Removed resched"
     return 0
