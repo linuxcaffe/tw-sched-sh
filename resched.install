@@ -35,12 +35,13 @@ debug_msg "Starting installer with DEBUG_LEVEL=$DEBUG_LEVEL" 1
 
 # Directories
 HOME="${HOME:-$(eval echo ~$USER)}"
-TASKRC="${HOME}/.taskrc"
-TASK_DIR="${HOME}/.task"
+TASKRC="${TASKRC:-${HOME}/.taskrc}"
+TASK_DIR="${TW_TASK_DIR:-${HOME}/.task}"
 HOOKS_DIR="${TASK_DIR}/hooks"
 SCRIPTS_DIR="${TASK_DIR}/scripts"
 CONFIG_DIR="${TASK_DIR}/config"
 DOCS_DIR="${TASK_DIR}/docs"
+MAN_DIR="${DOCS_DIR}/man"
 
 # ============================================================================
 # Installation Function
@@ -68,22 +69,42 @@ install() {
     debug_msg "Installed script: $SCRIPTS_DIR/tsch.sh" 2
 
     debug_msg "Downloading config: sched.rc" 2
-    curl -fsSL "$BASE_URL/sched.rc" -o "$CONFIG_DIR/sched.rc" || {
+    curl -fsSL "$BASE_URL/sched.rc" -o "$CONFIG_DIR/sched.rc.new" || {
+        rm -f "$CONFIG_DIR/sched.rc.new"
         tw_error "Failed to download sched.rc"
         debug_msg "Download failed: sched.rc" 1
         return 1
     }
-    debug_msg "Installed config: $CONFIG_DIR/sched.rc" 2
-
-    # Add config to .taskrc
-    tw_msg "Checking .taskrc for existing config include..."
-    if ! grep -q "sched.rc" "$TASKRC" 2>/dev/null; then
-        echo "include ~/.task/config/sched.rc" >> "$TASKRC"
-        tw_msg "Added config include to .taskrc"
-        debug_msg "Added to .taskrc: include ~/.task/config/sched.rc" 2
+    if [[ ! -f "$CONFIG_DIR/sched.rc" ]]; then
+        mv "$CONFIG_DIR/sched.rc.new" "$CONFIG_DIR/sched.rc"
+        debug_msg "Installed config: $CONFIG_DIR/sched.rc" 2
+    elif cmp -s "$CONFIG_DIR/sched.rc" "$CONFIG_DIR/sched.rc.new"; then
+        rm -f "$CONFIG_DIR/sched.rc.new"
     else
-        tw_msg "Config already in .taskrc"
-        debug_msg "Config already present in .taskrc: sched.rc" 2
+        tw_msg "Kept your sched.rc; the new default is sched.rc.new"
+    fi
+
+    # Add config include to included.rc (if present) or .taskrc
+    INCLUDED_RC="${TASK_DIR}/config/included.rc"
+    if [ "$TASK_DIR" = "$HOME/.task" ]; then
+        INC_PATH="~/.task/config/sched.rc"
+    else
+        INC_PATH="${TASK_DIR}/config/sched.rc"
+    fi
+    if grep -qE "^[[:space:]]*include[[:space:]].*sched.rc" "$TASKRC" "$INCLUDED_RC" 2>/dev/null; then
+        tw_msg "Config already included"
+        debug_msg "Config already present: sched.rc" 2
+    elif grep -qE "^[[:space:]]*#[[:space:]]*include[[:space:]].*sched.rc" "$INCLUDED_RC" 2>/dev/null; then
+        sed -i.bak -E "s|^[[:space:]]*#[[:space:]]*(include[[:space:]].*sched.rc)[[:space:]]*(#.*)?$|\1|" "$INCLUDED_RC"
+        tw_msg "Re-enabled config include in included.rc"
+    elif [ -f "$INCLUDED_RC" ]; then
+        echo "include $INC_PATH" >> "$INCLUDED_RC"
+        tw_msg "Added config include to included.rc"
+        debug_msg "Added to included.rc: include $INC_PATH" 2
+    else
+        echo "include $INC_PATH" >> "$TASKRC"
+        tw_msg "Added config include to .taskrc"
+        debug_msg "Added to .taskrc: include $INC_PATH" 2
     fi
 
     tw_msg "Downloading documentation..."
@@ -128,7 +149,7 @@ remove() {
 
     # Remove files based on manifest
     grep "^$APPNAME|" "$MANIFEST_FILE" | cut -d"|" -f3 | while read -r file; do
-        if [ -f "$file" ]; then
+        if [ -f "$file" ] || [ -L "$file" ]; then   # -L: a link, even dangling
             rm "$file"
             debug_msg "Removed: $file" 2
             tw_msg "Removed: $(basename $file)"
@@ -139,8 +160,13 @@ remove() {
     sed -i.bak "/^$APPNAME|/d" "$MANIFEST_FILE"
     debug_msg "Removed from manifest" 2
 
-    # Remove config from .taskrc
-    if grep -q "sched.rc" "$TASKRC" 2>/dev/null; then
+    # Remove config include from included.rc or .taskrc
+    INCLUDED_RC="${TASK_DIR}/config/included.rc"
+    if grep -q "sched.rc" "$INCLUDED_RC" 2>/dev/null; then
+        sed -i.bak "/sched.rc/d" "$INCLUDED_RC"
+        tw_msg "Removed config from included.rc"
+        debug_msg "Removed from included.rc: sched.rc" 2
+    elif grep -q "sched.rc" "$TASKRC" 2>/dev/null; then
         sed -i.bak "/sched.rc/d" "$TASKRC"
         tw_msg "Removed config from .taskrc"
         debug_msg "Removed from .taskrc: sched.rc" 2
